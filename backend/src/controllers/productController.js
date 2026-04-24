@@ -43,7 +43,10 @@ const toComparableValue = (value) => {
   if (value === undefined) return undefined;
   if (value === null) return null;
   if (typeof value !== 'object') return value;
-  return JSON.parse(JSON.stringify(value));
+  // Strip Mongoose-generated _id / __v so only meaningful content is compared
+  return JSON.parse(JSON.stringify(value, (key, val) =>
+    (key === '_id' || key === '__v') ? undefined : val
+  ));
 };
 
 const areValuesEqual = (a, b) => {

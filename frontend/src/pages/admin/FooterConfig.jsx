@@ -102,7 +102,7 @@ function FieldError({ msg }) {
 
 const emptyLink = () => ({ title: '', url: '' });
 const emptySection = () => ({ title: '', links: [emptyLink()] });
-const emptySocial = () => ({ platform: 'facebook', url: '' });
+const emptySocial = (platform = 'facebook') => ({ platform, url: '' });
 const emptyBottomLink = () => ({ title: '', url: '' });
 
 export default function FooterConfig() {
@@ -265,7 +265,18 @@ export default function FooterConfig() {
   };
 
   // ─── Social helpers ─────────────────────────
-  const addSocial = () => setSocialMedia([...socialMedia, emptySocial()]);
+  const MAX_SOCIAL_LINKS = 5;
+  const addSocial = () => {
+    if (socialMedia.length >= MAX_SOCIAL_LINKS) {
+      return toast.error(`Maximum ${MAX_SOCIAL_LINKS} social links allowed`);
+    }
+    const usedPlatforms = new Set(socialMedia.map(s => s.platform));
+    const firstAvailable = PLATFORM_OPTIONS.find(p => !usedPlatforms.has(p.value));
+    if (!firstAvailable) {
+      return toast.error('All platforms have been added');
+    }
+    setSocialMedia([...socialMedia, emptySocial(firstAvailable.value)]);
+  };
   const removeSocial = (i) => setSocialMedia(socialMedia.filter((_, idx) => idx !== i));
   const updateSocial = (i, key, val) => {
     const updated = [...socialMedia];
@@ -478,8 +489,13 @@ export default function FooterConfig() {
                   <Share2 size={16} color="var(--color-primary)" />
                   <h3>Follow Us — Social Media</h3>
                 </div>
-                <button className="btn btn-sm btn-secondary" onClick={addSocial}>
-                  <Plus size={14} /> Add Platform
+                <button
+                  className="btn btn-sm btn-secondary"
+                  onClick={addSocial}
+                  disabled={socialMedia.length >= 5 || PLATFORM_OPTIONS.every(p => socialMedia.some(s => s.platform === p.value))}
+                >
+                  <Plus size={14} />
+                  {socialMedia.length >= 5 ? 'Maximum 5 platforms' : 'Add Platform'}
                 </button>
               </div>
               <div className="fc-content-card-body">
@@ -500,14 +516,13 @@ export default function FooterConfig() {
                       value={sm.platform}
                       onChange={e => updateSocial(i, 'platform', e.target.value)}
                     >
-                      {PLATFORM_OPTIONS.map(p => {
-                        const isAlreadySelected = socialMedia.some((s, idx) => idx !== i && s.platform === p.value);
-                        return (
-                          <option key={p.value} value={p.value} disabled={isAlreadySelected}>
+                      {PLATFORM_OPTIONS
+                        .filter(p => p.value === sm.platform || !socialMedia.some((s, idx) => idx !== i && s.platform === p.value))
+                        .map(p => (
+                          <option key={p.value} value={p.value}>
                             {p.label}
                           </option>
-                        );
-                      })}
+                        ))}
                     </select>
                     <input
                       className="form-input"
