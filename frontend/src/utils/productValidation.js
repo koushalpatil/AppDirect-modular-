@@ -31,8 +31,8 @@ export const RESOURCE_MAX_SIZE_BYTES = RESOURCE_MAX_SIZE_MB * 1024 * 1024;
 // ── Field length limits ───────────────────────────────────────────────────────
 export const LIMITS = {
   name: { min: 2, max: 100 },
-  tagline: { max: 150 },
-  developerName: { max: 100 },
+  tagline: { min: 2, max: 150 },
+  developerName: { min: 2, max: 100 },
   tag: { max: 30 },
   maxTags: 20,
   overviewTitle: { min: 2, max: 100 },
@@ -200,19 +200,55 @@ export function validateProductForm(form) {
   }
 
   // Tagline
-  if (form.tagline && form.tagline.length > LIMITS.tagline.max) {
+  const tagline = (form.tagline || '').trim();
+  if (!tagline) {
+    errors.push('Tagline is required.');
+  } else if (tagline.length < LIMITS.tagline.min) {
+    errors.push(`Tagline must be at least ${LIMITS.tagline.min} characters.`);
+  } else if (tagline.length > LIMITS.tagline.max) {
     errors.push(`Tagline must be under ${LIMITS.tagline.max} characters.`);
   }
 
   // Developer Name
-  if (form.developerName && form.developerName.length > LIMITS.developerName.max) {
+  const developerName = (form.developerName || '').trim();
+  if (!developerName) {
+    errors.push('Developer name is required.');
+  } else if (developerName.length < LIMITS.developerName.min) {
+    errors.push(`Developer name must be at least ${LIMITS.developerName.min} characters.`);
+  } else if (developerName.length > LIMITS.developerName.max) {
     errors.push(`Developer name must be under ${LIMITS.developerName.max} characters.`);
   }
 
+  // Logo
+  if (!(form.logo || '').trim()) {
+    errors.push('Product logo is required.');
+  }
+
+  // Tags
+  if (!Array.isArray(form.tags) || form.tags.length === 0) {
+    errors.push('At least 1 tag is required.');
+  }
+
   // Overview
-  (form.overview || []).forEach((item, i) => {
+  const overviewItems = form.overview || [];
+  if (overviewItems.length === 0) {
+    errors.push('At least 1 overview section is required.');
+  }
+  overviewItems.forEach((item, i) => {
     const t = (item.title || '').trim();
     const d = (item.description || '').trim();
+    if (!t) {
+      errors.push(`Overview #${i + 1} title is required.`);
+    }
+    if (!d) {
+      errors.push(`Overview #${i + 1} description is required.`);
+    }
+    if (t && t.length < LIMITS.overviewTitle.min) {
+      errors.push(`Overview #${i + 1} title must be at least ${LIMITS.overviewTitle.min} characters.`);
+    }
+    if (d && d.length < LIMITS.overviewDescription.min) {
+      errors.push(`Overview #${i + 1} description must be at least ${LIMITS.overviewDescription.min} characters.`);
+    }
     if (t && t.length > LIMITS.overviewTitle.max) {
       errors.push(`Overview #${i + 1} title must be under ${LIMITS.overviewTitle.max} characters.`);
     }
@@ -225,9 +261,25 @@ export function validateProductForm(form) {
   });
 
   // Features
-  (form.features || []).forEach((item, i) => {
+  const featureItems = form.features || [];
+  if (featureItems.length === 0) {
+    errors.push('At least 1 feature section is required.');
+  }
+  featureItems.forEach((item, i) => {
     const t = (item.title || '').trim();
     const d = (item.description || '').trim();
+    if (!t) {
+      errors.push(`Feature #${i + 1} title is required.`);
+    }
+    if (!d) {
+      errors.push(`Feature #${i + 1} description is required.`);
+    }
+    if (t && t.length < LIMITS.featureTitle.min) {
+      errors.push(`Feature #${i + 1} title must be at least ${LIMITS.featureTitle.min} characters.`);
+    }
+    if (d && d.length < LIMITS.featureDescription.min) {
+      errors.push(`Feature #${i + 1} description must be at least ${LIMITS.featureDescription.min} characters.`);
+    }
     if (t && t.length > LIMITS.featureTitle.max) {
       errors.push(`Feature #${i + 1} title must be under ${LIMITS.featureTitle.max} characters.`);
     }
@@ -268,6 +320,18 @@ export function validateProductForm(form) {
     elements.forEach((el, ei) => {
       const et = (el.title || '').trim();
       const ed = (el.description || '').trim();
+      if (!et) {
+        errors.push(`Custom tab "${tn || `#${ti + 1}`}" element #${ei + 1} title is required.`);
+      }
+      if (!ed) {
+        errors.push(`Custom tab "${tn || `#${ti + 1}`}" element #${ei + 1} description is required.`);
+      }
+      if (et && et.length < LIMITS.customTabElementTitle.min) {
+        errors.push(`Custom tab "${tn || `#${ti + 1}`}" element #${ei + 1} title must be at least ${LIMITS.customTabElementTitle.min} characters.`);
+      }
+      if (ed && ed.length < LIMITS.customTabElementDescription.min) {
+        errors.push(`Custom tab "${tn || `#${ti + 1}`}" element #${ei + 1} description must be at least ${LIMITS.customTabElementDescription.min} characters.`);
+      }
       if (et && et.length > LIMITS.customTabElementTitle.max) {
         errors.push(`Custom tab "${tn}" element #${ei + 1} title must be under ${LIMITS.customTabElementTitle.max} characters.`);
       }
@@ -279,6 +343,14 @@ export function validateProductForm(form) {
       }
     });
   });
+
+  // Contact Us form selection / data consistency
+  if (typeof form.useCustomContactForm !== 'boolean') {
+    errors.push('Contact Us form selection is required.');
+  }
+  if (form.useCustomContactForm && (!Array.isArray(form.contactFields) || form.contactFields.length === 0)) {
+    errors.push('At least 1 custom contact form field is required when custom contact form is enabled.');
+  }
 
   return errors;
 }

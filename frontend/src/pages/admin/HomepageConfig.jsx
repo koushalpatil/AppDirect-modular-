@@ -180,7 +180,7 @@ export default function HomepageConfig() {
 
       {/* Categories */}
       <div className="homepage-section">
-        <h3 className="wizard-section-title">Homepage Categories & Products</h3>
+        <h3 className="wizard-section-title">Featured Products & Categories</h3>
         <p className="text-muted mb-md" style={{ fontSize: 13 }}>Select categories to display on the homepage and choose which products appear under each.</p>
 
         <div className="flex gap-sm mb-lg flex-wrap items-center" style={{ alignItems: 'flex-end' }}>

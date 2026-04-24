@@ -25,15 +25,50 @@ const FIELD_TYPES = [
   { value: 'text', label: 'Text' },
   { value: 'textarea', label: 'Textarea' },
   { value: 'email', label: 'Email' },
-  { value: 'url', label: 'URL' },
   { value: 'tel', label: 'Phone (Tel)' },
   { value: 'number', label: 'Number' },
   { value: 'select', label: 'Dropdown (Select)' },
   { value: 'radio', label: 'Radio Buttons' },
   { value: 'checkbox', label: 'Checkboxes' },
   { value: 'date', label: 'Date Picker' },
-  { value: 'file', label: 'File Upload' },
 ];
+
+const DEFAULT_VALIDATIONS = {
+  minLength: '',
+  maxLength: '',
+  min: '',
+  max: '',
+  step: '',
+  minDate: '',
+  maxDate: '',
+};
+
+const OPTION_FIELD_TYPES = new Set(['select', 'radio', 'checkbox']);
+const CHOICE_FIELD_TYPES = new Set(['radio', 'checkbox']);
+const TEXT_VALIDATION_TYPES = new Set(['text', 'textarea', 'tel']);
+const PREVIEW_TEXT_INPUT_TYPES = new Set(['text', 'email', 'number', 'date', 'tel']);
+const FULL_WIDTH_PREVIEW_TYPES = new Set(['textarea', 'checkbox', 'radio']);
+const INPUT_TYPE_OVERRIDES = { tel: 'text' };
+const FIELD_TYPE_LABEL_MAP = FIELD_TYPES.reduce((acc, type) => {
+  acc[type.value] = type.label;
+  return acc;
+}, {});
+
+const toOptionalNumber = (value) => (value === '' || value === undefined || value === null ? undefined : Number(value));
+
+const getDefaultValueByType = (type, currentValue) => {
+  if (type === 'checkbox') {
+    return Array.isArray(currentValue) ? currentValue : [];
+  }
+  return typeof currentValue === 'string' ? currentValue : '';
+};
+
+const applyFieldTypeChange = (currentField, nextType) => ({
+  ...currentField,
+  type: nextType,
+  options: OPTION_FIELD_TYPES.has(nextType) ? currentField.options : [],
+  defaultValue: getDefaultValueByType(nextType, currentField.defaultValue),
+});
 
 const buildEmptyField = (order) => ({
   fieldName: '',
@@ -44,17 +79,7 @@ const buildEmptyField = (order) => ({
   helpText: '',
   defaultValue: '',
   options: [],
-  validations: {
-    minLength: '',
-    maxLength: '',
-    regex: '',
-    min: '',
-    max: '',
-    step: '',
-    minDate: '',
-    maxDate: '',
-    customError: '',
-  },
+  validations: { ...DEFAULT_VALIDATIONS },
   isDefault: false,
   order,
 });
@@ -68,6 +93,66 @@ const normalizeKey = (value) =>
     .replace(/^_+/, '')
     .replace(/_+/g, '_')
     .toLowerCase();
+
+const normalizeValidationPayload = (validations = {}) => ({
+  minLength: toOptionalNumber(validations.minLength),
+  maxLength: toOptionalNumber(validations.maxLength),
+  min: toOptionalNumber(validations.min),
+  max: toOptionalNumber(validations.max),
+  step: toOptionalNumber(validations.step),
+  minDate: validations.minDate || undefined,
+  maxDate: validations.maxDate || undefined,
+});
+
+const getFieldTypeLabel = (type) => FIELD_TYPE_LABEL_MAP[type] || type;
+
+const getFieldFormErrors = ({ form, currentFields, editIndex }) => {
+  const errors = {};
+  const label = form.label.trim();
+  const fieldName = normalizeKey(form.fieldName || label);
+  const options = form.options || [];
+  const validations = form.validations || {};
+
+  if (!label) errors.label = 'Label is required';
+  if (!fieldName) errors.fieldName = 'Field name is required';
+
+  const duplicate = currentFields.some(
+    (field, idx) => idx !== editIndex && normalizeKey(field.fieldName) === fieldName
+  );
+  if (duplicate) errors.fieldName = 'Field name must be unique';
+
+  if (OPTION_FIELD_TYPES.has(form.type) && options.length === 0) {
+    errors.options = 'Add at least one option';
+  }
+
+  const minLength = toOptionalNumber(validations.minLength);
+  const maxLength = toOptionalNumber(validations.maxLength);
+  if (minLength !== undefined && maxLength !== undefined && minLength > maxLength) {
+    errors.minLength = 'Min length cannot be greater than max length';
+  }
+
+  const min = toOptionalNumber(validations.min);
+  const max = toOptionalNumber(validations.max);
+  if (min !== undefined && max !== undefined && min > max) {
+    errors.min = 'Min value cannot be greater than max value';
+  }
+
+  return { errors, fieldName };
+};
+
+const buildFieldPayload = ({ form, fieldName, currentFields, editIndex }) => ({
+  ...form,
+  fieldName,
+  _uid: form._uid || generateFieldUid(),
+  placeholder: form.placeholder?.trim() || '',
+  helpText: form.helpText?.trim() || '',
+  options: (form.options || []).map((option) => ({
+    label: option.label.trim(),
+    value: option.value.trim(),
+  })),
+  validations: normalizeValidationPayload(form.validations || {}),
+  order: editIndex !== null ? currentFields[editIndex].order : currentFields.length,
+});
 
 /* ─── Stable UID helper ─────────────────────────────────────────────────────── */
 
@@ -149,7 +234,7 @@ const SortableField = memo(function SortableField({ field, index, onEdit, onRemo
           {field.isDefault && <span className="badge badge-primary" style={{ marginLeft: 8 }}>Default</span>}
         </div>
         <div className="config-field-type">
-          Type: {FIELD_TYPES.find((t) => t.value === field.type)?.label || field.type} | Key: {field.fieldName}
+          Type: {getFieldTypeLabel(field.type)} | Key: {field.fieldName}
         </div>
       </div>
       <div className="config-field-actions">
@@ -189,6 +274,18 @@ const FieldList = memo(function FieldList({ fields, sortableIds, sensors, onDrag
 /* ─── Preview Content (isolated from field list) ────────────────────────────── */
 
 function PreviewContent({ fields }) {
+  const renderChoiceField = (field, inputType, iconClassName) => (
+    <div className="pub-choice-list grid-cols">
+      {(field.options || []).map((option) => (
+        <label key={option.value} className="pub-choice-item" style={{ cursor: 'default' }}>
+          <input type={inputType} disabled />
+          <span className={iconClassName} />
+          <span className="pub-choice-label">{option.label}</span>
+        </label>
+      ))}
+    </div>
+  );
+
   if (fields.length === 0) {
     return <p style={{ textAlign: 'center', color: '#94a3b8' }}>No fields to preview.</p>;
   }
@@ -198,7 +295,7 @@ function PreviewContent({ fields }) {
         <div
           key={field._uid || field.fieldName}
           style={{
-            gridColumn: ['textarea', 'checkbox', 'radio'].includes(field.type) ? '1 / -1' : 'auto',
+            gridColumn: FULL_WIDTH_PREVIEW_TYPES.has(field.type) ? '1 / -1' : 'auto',
             textAlign: 'left',
           }}
         >
@@ -207,8 +304,8 @@ function PreviewContent({ fields }) {
             {field.required && <span className="required">*</span>}
           </label>
           {field.type === 'textarea' && <textarea className="form-input" rows={4} placeholder={field.placeholder} disabled />}
-          {['text', 'email', 'number', 'date', 'tel', 'url'].includes(field.type) && (
-            <input type={['tel', 'url'].includes(field.type) ? 'text' : field.type} className="form-input" placeholder={field.placeholder} disabled />
+          {PREVIEW_TEXT_INPUT_TYPES.has(field.type) && (
+            <input type={INPUT_TYPE_OVERRIDES[field.type] || field.type} className="form-input" placeholder={field.placeholder} disabled />
           )}
           {field.type === 'select' && (
             <select className="form-select" disabled>
@@ -216,28 +313,8 @@ function PreviewContent({ fields }) {
               {(field.options || []).map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
           )}
-          {field.type === 'radio' && (
-            <div className="pub-choice-list grid-cols">
-              {(field.options || []).map((o) => (
-                <label key={o.value} className="pub-choice-item" style={{ cursor: 'default' }}>
-                  <input type="radio" disabled />
-                  <span className="pub-radio-box" />
-                  <span className="pub-choice-label">{o.label}</span>
-                </label>
-              ))}
-            </div>
-          )}
-          {field.type === 'checkbox' && (
-            <div className="pub-choice-list grid-cols">
-              {(field.options || []).map((o) => (
-                <label key={o.value} className="pub-choice-item" style={{ cursor: 'default' }}>
-                  <input type="checkbox" disabled />
-                  <span className="pub-check-box" />
-                  <span className="pub-choice-label">{o.label}</span>
-                </label>
-              ))}
-            </div>
-          )}
+          {field.type === 'radio' && renderChoiceField(field, 'radio', 'pub-radio-box')}
+          {field.type === 'checkbox' && renderChoiceField(field, 'checkbox', 'pub-check-box')}
           {field.type === 'file' && (
             <div style={{ padding: 20, border: '2px dashed #e2e8f0', borderRadius: 8, textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>
               File Upload Field
@@ -253,6 +330,20 @@ function PreviewContent({ fields }) {
 /* ─── Edit / Add field modal content ────────────────────────────────────────── */
 
 function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionInput, setOptionInput, onSave, onClose, syncFieldName, addOption, removeOption }) {
+  const isChoiceField = CHOICE_FIELD_TYPES.has(fieldForm.type);
+  const hasOptions = OPTION_FIELD_TYPES.has(fieldForm.type);
+  const hasTextValidations = TEXT_VALIDATION_TYPES.has(fieldForm.type);
+
+  const updateValidation = (key, value) => {
+    setFieldForm((prev) => ({
+      ...prev,
+      validations: {
+        ...prev.validations,
+        [key]: value,
+      },
+    }));
+  };
+
   return (
     <>
       <div className="modal-header">
@@ -282,15 +373,7 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
               value={fieldForm.type}
               onChange={(e) => {
                 const nextType = e.target.value;
-                setFieldForm((p) => ({
-                  ...p,
-                  type: nextType,
-                  options: ['select', 'radio', 'checkbox'].includes(nextType) ? p.options : [],
-                  defaultValue:
-                    nextType === 'checkbox'
-                      ? Array.isArray(p.defaultValue) ? p.defaultValue : []
-                      : typeof p.defaultValue === 'string' ? p.defaultValue : '',
-                }));
+                setFieldForm((prev) => applyFieldTypeChange(prev, nextType));
               }}
             >
               {FIELD_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
@@ -309,7 +392,7 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
             />
             {modalErrors.fieldName && <small className="text-danger">{modalErrors.fieldName}</small>}
           </div>
-          {!['radio', 'checkbox'].includes(fieldForm.type) && (
+          {!isChoiceField && (
             <div className="form-group">
               <label className="form-label">Default Value</label>
               {fieldForm.type === 'select' ? (
@@ -327,13 +410,13 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
             </div>
           )}
         </div>
-        {!['radio', 'checkbox'].includes(fieldForm.type) && (
+        {!isChoiceField && (
           <div className="form-group">
             <label className="form-label">Placeholder</label>
             <input type="text" className="form-input" value={fieldForm.placeholder || ''} onChange={(e) => setFieldForm((p) => ({ ...p, placeholder: e.target.value }))} />
           </div>
         )}
-        {!['radio', 'checkbox'].includes(fieldForm.type) && (
+        {!isChoiceField && (
           <div className="form-group">
             <label className="form-label">Help text / Description</label>
             <input type="text" className="form-input" value={fieldForm.helpText || ''} onChange={(e) => setFieldForm((p) => ({ ...p, helpText: e.target.value }))} />
@@ -348,7 +431,7 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
         </div>
 
         {/* Options for select/radio/checkbox */}
-        {['select', 'radio', 'checkbox'].includes(fieldForm.type) && (
+        {hasOptions && (
           <div className="form-group mt-md">
             <label className="form-label">Options</label>
             <div className="option-input-row">
@@ -372,27 +455,17 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
         )}
 
         {/* Text / textarea validations */}
-        {(fieldForm.type === 'text' || fieldForm.type === 'textarea' || fieldForm.type === 'tel') && (
+        {hasTextValidations && (
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Min length</label>
-              <input type="number" className="form-input" value={fieldForm.validations.minLength} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, minLength: e.target.value } }))} />
+              <input type="number" className="form-input" value={fieldForm.validations.minLength} onChange={(e) => updateValidation('minLength', e.target.value)} />
               {modalErrors.minLength && <small className="text-danger">{modalErrors.minLength}</small>}
             </div>
             <div className="form-group">
               <label className="form-label">Max length</label>
-              <input type="number" className="form-input" value={fieldForm.validations.maxLength} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, maxLength: e.target.value } }))} />
+              <input type="number" className="form-input" value={fieldForm.validations.maxLength} onChange={(e) => updateValidation('maxLength', e.target.value)} />
             </div>
-          </div>
-        )}
-
-        {(fieldForm.type === 'text' || fieldForm.type === 'textarea' || fieldForm.type === 'tel') && (
-          <div className="form-group">
-            <label className="form-label">Regex validation (optional)</label>
-            <input type="text" className="form-input" value={fieldForm.validations.regex} placeholder="e.g. ^[A-Za-z ]+$"
-              onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, regex: e.target.value } }))}
-            />
-            {modalErrors.regex && <small className="text-danger">{modalErrors.regex}</small>}
           </div>
         )}
 
@@ -401,16 +474,16 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
           <div className="contact-num-grid">
             <div className="form-group">
               <label className="form-label">Min value</label>
-              <input type="number" className="form-input" value={fieldForm.validations.min} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, min: e.target.value } }))} />
+              <input type="number" className="form-input" value={fieldForm.validations.min} onChange={(e) => updateValidation('min', e.target.value)} />
               {modalErrors.min && <small className="text-danger">{modalErrors.min}</small>}
             </div>
             <div className="form-group">
               <label className="form-label">Max value</label>
-              <input type="number" className="form-input" value={fieldForm.validations.max} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, max: e.target.value } }))} />
+              <input type="number" className="form-input" value={fieldForm.validations.max} onChange={(e) => updateValidation('max', e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Step</label>
-              <input type="number" className="form-input" value={fieldForm.validations.step} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, step: e.target.value } }))} />
+              <input type="number" className="form-input" value={fieldForm.validations.step} onChange={(e) => updateValidation('step', e.target.value)} />
             </div>
           </div>
         )}
@@ -420,21 +493,15 @@ function FieldFormModal({ isEdit, fieldForm, setFieldForm, modalErrors, optionIn
           <div className="grid-2">
             <div className="form-group">
               <label className="form-label">Min date</label>
-              <input type="date" className="form-input" value={fieldForm.validations.minDate} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, minDate: e.target.value } }))} />
+              <input type="date" className="form-input" value={fieldForm.validations.minDate} onChange={(e) => updateValidation('minDate', e.target.value)} />
             </div>
             <div className="form-group">
               <label className="form-label">Max date</label>
-              <input type="date" className="form-input" value={fieldForm.validations.maxDate} onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, maxDate: e.target.value } }))} />
+              <input type="date" className="form-input" value={fieldForm.validations.maxDate} onChange={(e) => updateValidation('maxDate', e.target.value)} />
             </div>
           </div>
         )}
 
-        <div className="form-group mt-md">
-          <label className="form-label">Custom Error Message (optional)</label>
-          <input type="text" className="form-input" placeholder="Leave empty for default message" value={fieldForm.validations.customError || ''}
-            onChange={(e) => setFieldForm((p) => ({ ...p, validations: { ...p.validations, customError: e.target.value } }))}
-          />
-        </div>
       </div>
       <div className="modal-footer">
         <button className="btn btn-secondary" onClick={onClose}>Cancel</button>
@@ -496,7 +563,7 @@ export default function ContactFieldEditor({ fields, setFields }) {
       ...buildEmptyField(idx),
       ...field,
       options: Array.isArray(field.options) ? field.options : [],
-      validations: { ...buildEmptyField(idx).validations, ...(field.validations || {}) },
+      validations: { ...DEFAULT_VALIDATIONS, ...(field.validations || {}) },
       defaultValue: field.defaultValue ?? (field.type === 'checkbox' ? [] : ''),
     });
     setOptionInput({ label: '', value: '' });
@@ -568,59 +635,15 @@ export default function ContactFieldEditor({ fields, setFields }) {
 
   const handleSaveField = useCallback(() => {
     const form = fieldForm;
-    const errs = {};
-    const label = form.label.trim();
-    const fieldName = normalizeKey(form.fieldName || label);
-    const options = form.options || [];
-    const validations = form.validations || {};
-
-    if (!label) errs.label = 'Label is required';
-    if (!fieldName) errs.fieldName = 'Field name is required';
-
     const currentFields = fieldsRef.current;
-    const duplicate = currentFields.some((f, idx) => idx !== editIndex && normalizeKey(f.fieldName) === fieldName);
-    if (duplicate) errs.fieldName = 'Field name must be unique';
-
-    if (['select', 'radio', 'checkbox'].includes(form.type) && options.length === 0) {
-      errs.options = 'Add at least one option';
-    }
-
-    const minLength = validations.minLength === '' ? undefined : Number(validations.minLength);
-    const maxLength = validations.maxLength === '' ? undefined : Number(validations.maxLength);
-    if (minLength !== undefined && maxLength !== undefined && minLength > maxLength) errs.minLength = 'Min length cannot be greater than max length';
-
-    const min = validations.min === '' ? undefined : Number(validations.min);
-    const max = validations.max === '' ? undefined : Number(validations.max);
-    if (min !== undefined && max !== undefined && min > max) errs.min = 'Min value cannot be greater than max value';
-
-    if (validations.regex) {
-      try { new RegExp(validations.regex); } catch { errs.regex = 'Invalid regex pattern'; }
-    }
+    const { errors: errs, fieldName } = getFieldFormErrors({ form, currentFields, editIndex });
 
     if (Object.keys(errs).length > 0) {
       setModalErrors(errs);
       return;
     }
 
-    const data = {
-      ...form,
-      fieldName,
-      _uid: form._uid || generateFieldUid(),
-      placeholder: form.placeholder?.trim() || '',
-      helpText: form.helpText?.trim() || '',
-      options: options.map((o) => ({ label: o.label.trim(), value: o.value.trim() })),
-      validations: {
-        minLength: validations.minLength === '' ? undefined : Number(validations.minLength),
-        maxLength: validations.maxLength === '' ? undefined : Number(validations.maxLength),
-        regex: validations.regex?.trim() || undefined,
-        min: validations.min === '' ? undefined : Number(validations.min),
-        max: validations.max === '' ? undefined : Number(validations.max),
-        step: validations.step === '' ? undefined : Number(validations.step),
-        minDate: validations.minDate || undefined,
-        maxDate: validations.maxDate || undefined,
-      },
-      order: editIndex !== null ? currentFields[editIndex].order : currentFields.length,
-    };
+    const data = buildFieldPayload({ form, fieldName, currentFields, editIndex });
 
     const updated = [...currentFields];
     if (editIndex !== null) {

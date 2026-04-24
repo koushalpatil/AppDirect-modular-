@@ -39,6 +39,19 @@ const sanitizeString = (str, maxLen) => {
   return str.trim().slice(0, maxLen);
 };
 
+const toComparableValue = (value) => {
+  if (value === undefined) return undefined;
+  if (value === null) return null;
+  if (typeof value !== 'object') return value;
+  return JSON.parse(JSON.stringify(value));
+};
+
+const areValuesEqual = (a, b) => {
+  const left = toComparableValue(a);
+  const right = toComparableValue(b);
+  return JSON.stringify(left) === JSON.stringify(right);
+};
+
 /**
  * Validate product payload. Returns array of error strings.
  * @param {Object} data - The request body
@@ -254,20 +267,21 @@ exports.updateProduct = async (req, res) => {
     ];
 
     updateFields.forEach((field) => {
-      if (req.body[field] !== undefined) {
-        previousValues[field] = product[field];
-        let value = req.body[field];
-        // Sanitize contactFields: strip _uid and clear when toggle is off
-        if (field === 'contactFields') {
-          value = sanitizeContactFields(value, req.body.useCustomContactForm ?? product.useCustomContactForm);
-        }
-        changes[field] = value;
-        product[field] = value;
-      }
-    });
+      if (req.body[field] === undefined) return;
 
-    product.updatedBy = req.user._id;
-    await product.save();
+      let value = req.body[field];
+      // Sanitize contactFields: strip _uid and clear when toggle is off
+      if (field === 'contactFields') {
+        value = sanitizeContactFields(value, req.body.useCustomContactForm ?? product.useCustomContactForm);
+      }
+
+      const currentValue = product[field];
+      if (areValuesEqual(currentValue, value)) return;
+
+      previousValues[field] = currentValue;
+      changes[field] = value;
+      product[field] = value;
+    });
 
     // Determine action type
     let action = 'updated';
@@ -277,13 +291,18 @@ exports.updateProduct = async (req, res) => {
       action = 'unpublished';
     }
 
-    await ProductEditLog.create({
-      productId: product._id,
-      editedBy: req.user._id,
-      action,
-      changes,
-      previousValues,
-    });
+    if (Object.keys(changes).length > 0) {
+      product.updatedBy = req.user._id;
+      await product.save();
+
+      await ProductEditLog.create({
+        productId: product._id,
+        editedBy: req.user._id,
+        action,
+        changes,
+        previousValues,
+      });
+    }
 
     res.json({ message: 'Product updated successfully.', product });
   } catch (error) {
@@ -399,6 +418,10 @@ exports.searchProducts = async (req, res) => {
   try {
     const { search, filters, productIds, page = 1, limit = 20 } = req.query;
     const filter = { status: 'published' };
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    const sort = req.query.sort || 'relevance';
 
     if (productIds) {
       const ids = productIds
@@ -409,20 +432,6 @@ exports.searchProducts = async (req, res) => {
       if (ids.length > 0) {
         filter._id = { $in: ids };
       }
-    }
-
-    // Text search across multiple fields
-    if (search && search.trim()) {
-      const searchRegex = search.trim().split(/\s+/).map(word =>
-        `(?=.*${word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`
-      ).join('');
-      filter.$or = [
-        { name: { $regex: search, $options: 'i' } },
-        { tagline: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
-        { developerName: { $regex: search, $options: 'i' } },
-        { 'attributes.values': { $regex: search, $options: 'i' } },
-      ];
     }
 
     // Multi-attribute filtering: filters is JSON like {"attrId1":["val1","val2"],"attrId2":["val3"]}
@@ -450,28 +459,96 @@ exports.searchProducts = async (req, res) => {
       }
     }
 
-    const skip = (parseInt(page) - 1) * parseInt(limit);
-    const total = await Product.countDocuments(filter);
-    
-    // Sort logic mapping
-    const sort = req.query.sort || 'relevance';
-    let sortQuery = { updatedAt: -1 }; // Fallback relevance
-    if (sort === 'newest') sortQuery = { createdAt: -1 };
-    if (sort === 'alphabetical') sortQuery = { name: 1 };
-    
-    const products = await Product.find(filter)
-      .select('name tagline logo tags developerName attributes createdAt updatedAt')
-      .populate('attributes.attributeId', 'name displayOnHomepage showForFiltering')
-      .sort(sortQuery)
-      .skip(skip)
-      .limit(parseInt(limit));
+    const hasSearch = !!(search && search.trim());
+    let products = [];
+    let total = 0;
+
+    if (hasSearch) {
+      const dataPipeline = [];
+
+      if (sort === 'alphabetical') {
+        dataPipeline.push({ $addFields: { sortNameLower: { $toLower: '$name' } } });
+        dataPipeline.push({ $sort: { sortNameLower: 1, _id: 1 } });
+      } else if (sort === 'newest') {
+        dataPipeline.push({ $sort: { createdAt: -1 } });
+      } else {
+        dataPipeline.push({ $sort: { searchScore: -1, createdAt: -1 } });
+      }
+
+      dataPipeline.push(
+        { $skip: skip },
+        { $limit: limitNum },
+        {
+          $project: {
+            name: 1,
+            tagline: 1,
+            logo: 1,
+            tags: 1,
+            developerName: 1,
+            attributes: 1,
+            createdAt: 1,
+            updatedAt: 1,
+          },
+        }
+      );
+
+      const pipeline = [
+        {
+          $search: {
+            index: 'default',
+            compound: {
+              must: [
+                {
+                  text: {
+                    query: search.trim(),
+                    path: ['name', 'tagline', 'tags'],
+                    fuzzy: { maxEdits: 1, prefixLength: 2 },
+                  },
+                },
+              ],
+            },
+          },
+        },
+        { $match: filter },
+        { $addFields: { searchScore: { $meta: 'searchScore' } } },
+        {
+          $facet: {
+            metadata: [{ $count: 'total' }],
+            data: dataPipeline,
+          },
+        },
+      ];
+
+      const result = await Product.aggregate(pipeline);
+      const payload = result[0] || { metadata: [], data: [] };
+      total = payload.metadata?.[0]?.total || 0;
+      products = payload.data || [];
+    } else {
+      let sortQuery = { updatedAt: -1 };
+      if (sort === 'newest') sortQuery = { createdAt: -1 };
+      if (sort === 'alphabetical') sortQuery = { name: 1 };
+
+      total = await Product.countDocuments(filter);
+      const query = Product.find(filter)
+        .select('name tagline logo tags developerName attributes createdAt updatedAt')
+        .populate('attributes.attributeId', 'name displayOnHomepage showForFiltering')
+        .sort(sortQuery)
+        .skip(skip)
+        .limit(limitNum);
+
+      if (sort === 'alphabetical') {
+        query.collation({ locale: 'en', strength: 2 });
+      }
+
+      products = await query;
+    }
 
     res.json({
       products,
       pagination: {
         total,
-        page: parseInt(page),
-        pages: Math.ceil(total / parseInt(limit)),
+        page: pageNum,
+        pages: Math.ceil(total / limitNum),
       },
     });
   } catch (error) {
@@ -518,54 +595,14 @@ exports.getFilterFacets = async (req, res) => {
       } catch (e) { /* ignore */ }
     }
 
-    // For each filterable attribute, compute available values
-    // by applying all OTHER filters (not the current attribute's filter)
-    const facets = [];
-
-    for (const attr of filterableAttrs) {
-      const attrFilter = { ...baseFilter };
-      const attrConditions = [];
-
-      // Apply all filters EXCEPT this attribute
-      for (const [attrId, values] of Object.entries(parsedFilters)) {
-        if (attrId !== attr._id.toString() && Array.isArray(values) && values.length > 0) {
-          attrConditions.push({
-            attributes: {
-              $elemMatch: {
-                attributeId: attrId,
-                values: { $in: values },
-              },
-            },
-          });
-        }
-      }
-
-      if (attrConditions.length > 0) {
-        attrFilter.$and = attrConditions;
-      }
-
-      // Find all products matching the cross-filter, then extract unique values for this attribute
-      const products = await Product.find(attrFilter)
-        .select('attributes')
-        .lean();
-
-      const availableValues = new Set();
-      for (const prod of products) {
-        const prodAttr = (prod.attributes || []).find(
-          a => a.attributeId?.toString() === attr._id.toString()
-        );
-        if (prodAttr) {
-          prodAttr.values.forEach(v => availableValues.add(v));
-        }
-      }
-
-      facets.push({
+    const facets = filterableAttrs.map((attr) => {
+      return {
         _id: attr._id,
         name: attr.name,
-        options: attr.options.filter(opt => availableValues.has(opt)),
+        options: attr.options || [],
         selectedValues: parsedFilters[attr._id.toString()] || [],
-      });
-    }
+      };
+    });
 
     res.json({ facets });
   } catch (error) {

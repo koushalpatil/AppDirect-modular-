@@ -1,4 +1,5 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { useEffect } from 'react';
 import { AuthProvider } from './context/AuthContext';
 import { Toaster } from 'react-hot-toast';
 import ProtectedRoute from './features/auth/components/ProtectedRoute';
@@ -9,7 +10,6 @@ import PublicLayout from './layouts/PublicLayout';
 
 // Auth
 import Login from './pages/auth/Login';
-import Signup from './pages/auth/Signup';
 
 // Admin pages
 import AdminDashboard from './pages/admin/Dashboard';
@@ -29,47 +29,59 @@ import ProductDetail from './pages/public/ProductDetail';
 import ProductContact from './pages/public/ProductContact';
 import MyApps from './pages/public/MyApps';
 
+function ScrollToTopOnRouteChange() {
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [pathname]);
+
+  return null;
+}
+
 function AppRoutes() {
   return (
-    <Routes>
-      {/* Auth */}
-      <Route path="/login" element={<Login />} />
-      <Route path="/signup" element={<Signup />} />
+    <>
+      <ScrollToTopOnRouteChange />
+      <Routes>
+        {/* Auth */}
+        <Route path="/login" element={<Login />} />
 
-      {/* Admin */}
-      <Route path="/admin" element={
-        <ProtectedRoute adminOnly>
-          <AdminLayout />
-        </ProtectedRoute>
-      }>
-        <Route index element={<AdminDashboard />} />
-        <Route path="products" element={<ProductList />} />
-        <Route path="products/new" element={<ProductCreate />} />
-        <Route path="products/:id/edit" element={<ProductEdit />} />
-        <Route path="catalog" element={<CatalogManagement />} />
-        <Route path="config/contact" element={<ContactFormConfig />} />
-        <Route path="config/homepage" element={<HomepageConfig />} />
-        <Route path="config/similarity" element={<SimilaritySettings />} />
-        <Route path="config/footer" element={<FooterConfig />} />
-      </Route>
-
-      {/* Public Routes - Mostly Open */}
-      <Route path="/" element={<PublicLayout />}>
-        <Route index element={<HomePage />} />
-        <Route path="products" element={<AllProducts />} />
-        <Route path="products/:id" element={<ProductDetail />} />
-        <Route path="products/:id/add-lead" element={<ProductContact />} />
-        
-        {/* Protected Public Routes */}
-        <Route path="my-apps" element={
-          <ProtectedRoute>
-            <MyApps />
+        {/* Admin */}
+        <Route path="/admin" element={
+          <ProtectedRoute adminOnly>
+            <AdminLayout />
           </ProtectedRoute>
-        } />
-      </Route>
+        }>
+          <Route index element={<AdminDashboard />} />
+          <Route path="products" element={<ProductList />} />
+          <Route path="products/new" element={<ProductCreate />} />
+          <Route path="products/:id/edit" element={<ProductEdit />} />
+          <Route path="catalog" element={<CatalogManagement />} />
+          <Route path="config/contact" element={<ContactFormConfig />} />
+          <Route path="config/homepage" element={<HomepageConfig />} />
+          <Route path="config/similarity" element={<SimilaritySettings />} />
+          <Route path="config/footer" element={<FooterConfig />} />
+        </Route>
 
-      <Route path="*" element={<Navigate to="/" replace />} />
-    </Routes>
+        {/* Public Routes - Mostly Open */}
+        <Route path="/" element={<PublicLayout />}>
+          <Route index element={<HomePage />} />
+          <Route path="products" element={<AllProducts />} />
+          <Route path="products/:id" element={<ProductDetail />} />
+          <Route path="products/:id/add-lead" element={<ProductContact />} />
+          
+          {/* Protected Public Routes */}
+          <Route path="my-apps" element={
+            <ProtectedRoute>
+              <MyApps />
+            </ProtectedRoute>
+          } />
+        </Route>
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </>
   );
 }
 

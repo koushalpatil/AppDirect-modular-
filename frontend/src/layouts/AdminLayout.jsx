@@ -4,7 +4,7 @@ import { useAuth } from '../context/AuthContext';
 import {
   LayoutDashboard, Package, FolderTree, FileText, Settings, LogOut, Home, ChevronRight, Zap, PanelBottom, Menu, X
 } from 'lucide-react';
-import dbLogo from '../assets/dblogo1.webp';
+import dbLogo from '../assets/dblogo1.jpg';
 import './AdminLayout.css';
 
 export default function AdminLayout() {

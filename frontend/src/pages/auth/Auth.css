@@ -144,8 +144,15 @@
   color: white;
 }
 
+.brand-logo-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--border-radius-md);
+}
+
 .brand-name {
-  font-size: var(--font-size-xl);
+  font-size: var(--font-size-2xl);
   font-weight: 800;
   background: linear-gradient(135deg, var(--text-primary), var(--color-primary-light));
   -webkit-background-clip: text;
@@ -177,14 +184,13 @@
     font-size: var(--font-size-xs);
   }
 
-  .auth-logo .brand-icon {
-    width: 30px;
-    height: 30px;
-    font-size: var(--font-size-md);
+  .auth-logo .brand-logo-img {
+    width: 36px;
+    height: 36px;
   }
 
   .auth-logo .brand-name {
-    font-size: var(--font-size-lg);
+    font-size: var(--font-size-xl);
   }
 
   .role-option {

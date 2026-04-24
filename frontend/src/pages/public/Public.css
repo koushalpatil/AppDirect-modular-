@@ -1,9 +1,13 @@
 /* ============ PUBLIC PAGES — LIGHT THEME ============ */
 
+:root {
+  --pub-page-gutter: 24px;
+}
+
 .pub-section {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0 var(--pub-page-gutter);
 }
 
 /* ============ HERO ============ */
@@ -13,6 +17,7 @@
   width: 100%;
   max-width: 1280px;
   margin: 0 auto;
+  padding: 0 var(--pub-page-gutter);
 }
 
 .pub-hero-img-wrap {
@@ -53,13 +58,13 @@
 /* ============ SLIDER ============ */
 
 .pub-slider-section {
-  padding: 32px 0;
+  padding: 32px var(--pub-page-gutter);
 }
 
 .pub-slider-container {
   max-width: 1120px;
   margin: 0 auto;
-  padding: 0 24px;
+  padding: 0;
   position: relative;
   overflow: hidden;
   border-radius: 12px;
@@ -328,8 +333,8 @@
 
 .pub-card-developer {
   font-size: 11px;
-  color: #0183FF;
-  font-weight: 500;
+  color: #6b7280;
+  font-weight: 900;
   margin-top: 1px;
   white-space: nowrap;
   overflow: hidden;
@@ -394,7 +399,7 @@
 .all-products-page {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 32px 24px;
+  padding: 32px var(--pub-page-gutter);
   display: flex;
   gap: 32px;
 }
@@ -587,7 +592,7 @@
 .pd-page {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 0 24px 48px;
+  padding: 0 var(--pub-page-gutter) 48px;
 }
 
 /* Breadcrumb */
@@ -665,7 +670,8 @@
 }
 
 .pd-developer strong {
-  color: #0183FF;
+  color: inherit;
+  font-weight: 800;
 }
 
 .pd-contact-btn {
@@ -1214,8 +1220,12 @@
 }
 
 @media (max-width: 768px) {
+  :root {
+    --pub-page-gutter: 16px;
+  }
+
   .pd-page {
-    padding: 0 16px 32px;
+    padding: 0 var(--pub-page-gutter) 32px;
     overflow-x: hidden;
   }
 
@@ -1301,7 +1311,7 @@
   }
 
   .pub-section {
-    padding: 0 16px;
+    padding: 0 var(--pub-page-gutter);
   }
 
   .pub-cat-title {
@@ -1311,8 +1321,12 @@
 }
 
 @media (max-width: 480px) {
+  :root {
+    --pub-page-gutter: 12px;
+  }
+
   .all-products-page {
-    padding: 16px 12px;
+    padding: 16px var(--pub-page-gutter);
     gap: 20px;
   }
 
@@ -1335,7 +1349,7 @@
   .pub-slider-slide img { height: 160px; }
 
   .pd-page {
-    padding: 0 12px 32px;
+    padding: 0 var(--pub-page-gutter) 32px;
     overflow-x: hidden;
   }
 

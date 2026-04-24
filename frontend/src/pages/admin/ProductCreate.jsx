@@ -98,10 +98,14 @@ export default function ProductCreate() {
         if (v.length > LIMITS.name.max) return setFieldError('name', `Name must be under ${LIMITS.name.max} characters`);
         return setFieldError('name', null);
       case 'tagline':
-        if (v && v.length > LIMITS.tagline.max) return setFieldError('tagline', `Tagline must be under ${LIMITS.tagline.max} characters`);
+        if (!v) return setFieldError('tagline', 'Tagline is required');
+        if (v.length < LIMITS.tagline.min) return setFieldError('tagline', `Tagline must be at least ${LIMITS.tagline.min} characters`);
+        if (v.length > LIMITS.tagline.max) return setFieldError('tagline', `Tagline must be under ${LIMITS.tagline.max} characters`);
         return setFieldError('tagline', null);
       case 'developerName':
-        if (v && v.length > LIMITS.developerName.max) return setFieldError('developerName', `Developer name must be under ${LIMITS.developerName.max} characters`);
+        if (!v) return setFieldError('developerName', 'Developer name is required');
+        if (v.length < LIMITS.developerName.min) return setFieldError('developerName', `Developer name must be at least ${LIMITS.developerName.min} characters`);
+        if (v.length > LIMITS.developerName.max) return setFieldError('developerName', `Developer name must be under ${LIMITS.developerName.max} characters`);
         return setFieldError('developerName', null);
       default:
         return setFieldError(field, null);
@@ -365,14 +369,39 @@ export default function ProductCreate() {
       if (!name) { toast.error('Product name is required'); return false; }
       if (name.length < LIMITS.name.min) { toast.error(`Name must be at least ${LIMITS.name.min} characters`); return false; }
       if (name.length > LIMITS.name.max) { toast.error(`Name must be under ${LIMITS.name.max} characters`); return false; }
+      const tagline = form.tagline.trim();
+      if (!tagline) { toast.error('Tagline is required'); return false; }
+      if (tagline.length < LIMITS.tagline.min) { toast.error(`Tagline must be at least ${LIMITS.tagline.min} characters`); return false; }
+      if (tagline.length > LIMITS.tagline.max) { toast.error(`Tagline must be under ${LIMITS.tagline.max} characters`); return false; }
+      const developerName = form.developerName.trim();
+      if (!developerName) { toast.error('Developer name is required'); return false; }
+      if (developerName.length < LIMITS.developerName.min) { toast.error(`Developer name must be at least ${LIMITS.developerName.min} characters`); return false; }
+      if (developerName.length > LIMITS.developerName.max) { toast.error(`Developer name must be under ${LIMITS.developerName.max} characters`); return false; }
+      if (!form.logo) { toast.error('Product logo is required'); return false; }
+      if (!form.tags.length) { toast.error('At least 1 tag is required'); return false; }
     }
     if (step === 1) {
+      for (let i = 0; i < form.overview.length; i++) {
+        const item = form.overview[i];
+        if (!(item.title || '').trim()) { toast.error(`Overview #${i + 1} title is required`); return false; }
+        if (!(item.description || '').trim()) { toast.error(`Overview #${i + 1} description is required`); return false; }
+      }
+      for (let i = 0; i < form.features.length; i++) {
+        const item = form.features[i];
+        if (!(item.title || '').trim()) { toast.error(`Feature #${i + 1} title is required`); return false; }
+        if (!(item.description || '').trim()) { toast.error(`Feature #${i + 1} description is required`); return false; }
+      }
       // Validate custom tabs
       for (let i = 0; i < form.customTabs.length; i++) {
         const tab = form.customTabs[i];
         const tn = (tab.tabName || '').trim();
         if (!tn) { toast.error(`Custom tab #${i + 1} name is required`); return false; }
         if (tn.length < LIMITS.customTabName.min) { toast.error(`Custom tab #${i + 1} name must be at least ${LIMITS.customTabName.min} characters`); return false; }
+        for (let j = 0; j < (tab.elements || []).length; j++) {
+          const el = tab.elements[j];
+          if (!(el.title || '').trim()) { toast.error(`Custom tab #${i + 1} element #${j + 1} title is required`); return false; }
+          if (!(el.description || '').trim()) { toast.error(`Custom tab #${i + 1} element #${j + 1} description is required`); return false; }
+        }
       }
     }
     return true;
@@ -479,7 +508,7 @@ export default function ProductCreate() {
                 <>
                   <div className="form-group">
                     <label className="form-label">
-                      Title
+                      Title <span className="required">*</span>
                       <CharCount value={item.title} max={LIMITS[`${field.slice(0,-1)}Title`]?.max || 100} />
                     </label>
                     <input
@@ -493,7 +522,7 @@ export default function ProductCreate() {
                   </div>
                   <div className="form-group">
                     <label className="form-label">
-                      Description
+                      Description <span className="required">*</span>
                       <CharCount value={item.description} max={5000} warn={0.9} />
                     </label>
                     <textarea
@@ -511,6 +540,7 @@ export default function ProductCreate() {
                         {item.screenshots.length}/{SCREENSHOT_MAX_PER_SECTION} · Max 5MB each · JPEG/PNG/WebP/GIF
                       </span>
                     </label>
+                    <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>Optional</div>
                     <div className="screenshots-grid">
                       {item.screenshots.map((ss, ssIdx) => (
                         <div key={ssIdx} style={{ position: 'relative' }}>
@@ -551,7 +581,7 @@ export default function ProductCreate() {
               {/* Non-collapsible: overview */}
               <div className="form-group">
                 <label className="form-label">
-                  Title
+                  Title <span className="required">*</span>
                   <CharCount value={item.title} max={LIMITS[`${field.slice(0,-1)}Title`]?.max || 100} />
                 </label>
                 <input
@@ -565,7 +595,7 @@ export default function ProductCreate() {
               </div>
               <div className="form-group">
                 <label className="form-label">
-                  Description
+                  Description <span className="required">*</span>
                   <CharCount value={item.description} max={5000} warn={0.9} />
                 </label>
                 <textarea
@@ -583,6 +613,7 @@ export default function ProductCreate() {
                     {item.screenshots.length}/{SCREENSHOT_MAX_PER_SECTION} · Max 5MB each · JPEG/PNG/WebP/GIF
                   </span>
                 </label>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>Optional</div>
                 <div className="screenshots-grid">
                   {item.screenshots.map((ss, ssIdx) => (
                     <div key={ssIdx} style={{ position: 'relative' }}>
@@ -722,7 +753,7 @@ export default function ProductCreate() {
             {/* Tagline */}
             <div className="form-group">
               <label className="form-label">
-                Tagline
+                Tagline <span className="required">*</span>
                 <CharCount value={form.tagline} max={LIMITS.tagline.max} />
               </label>
               <input
@@ -736,13 +767,13 @@ export default function ProductCreate() {
               />
               <FieldError msg={fieldErrors.tagline} />
               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                Optional · Max {LIMITS.tagline.max} characters
+                Required · {LIMITS.tagline.min}–{LIMITS.tagline.max} characters
               </div>
             </div>
 
             {/* Product Logo */}
             <div className="form-group">
-              <label className="form-label">Product Logo</label>
+              <label className="form-label">Product Logo <span className="required">*</span></label>
               <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>
                 Accepted: JPEG, PNG, WebP, SVG · Max size: {LOGO_MAX_SIZE_MB}MB · Min 50×50px · Max 4096×4096px
               </div>
@@ -783,7 +814,7 @@ export default function ProductCreate() {
             {/* Developer Name */}
             <div className="form-group">
               <label className="form-label">
-                Developer Name
+                Developer Name <span className="required">*</span>
                 <CharCount value={form.developerName} max={LIMITS.developerName.max} />
               </label>
               <input
@@ -796,12 +827,15 @@ export default function ProductCreate() {
                 onBlur={(e) => validateField('developerName', e.target.value)}
               />
               <FieldError msg={fieldErrors.developerName} />
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                Required · {LIMITS.developerName.min}–{LIMITS.developerName.max} characters
+              </div>
             </div>
 
             {/* Tags */}
             <div className="form-group">
               <label className="form-label">
-                Tags
+                Tags <span className="required">*</span>
                 <span style={{ fontSize: 11, color: '#9ca3af', float: 'right' }}>
                   {form.tags.length}/{LIMITS.maxTags} tags · Max {LIMITS.tag.max} chars each
                 </span>
@@ -829,6 +863,9 @@ export default function ProductCreate() {
                     <span className="tag-remove" onClick={() => removeTag(tag)}>&times;</span>
                   </span>
                 ))}
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                At least 1 tag is required
               </div>
             </div>
           </div>
@@ -977,7 +1014,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Title
+                            Title <span className="required">*</span>
                             <CharCount value={el.title} max={LIMITS.customTabElementTitle.max} />
                           </label>
                           <input
@@ -992,7 +1029,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Description
+                            Description <span className="required">*</span>
                             <CharCount value={el.description} max={LIMITS.customTabElementDescription.max} warn={0.9} />
                           </label>
                           <textarea
@@ -1011,6 +1048,7 @@ export default function ProductCreate() {
                               {el.screenshots.length}/{SCREENSHOT_MAX_PER_SECTION} · Max 5MB each · JPEG/PNG/WebP/GIF
                             </span>
                           </label>
+                          <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>Optional</div>
                           <div className="screenshots-grid">
                             {el.screenshots.map((ss, ssIdx) => (
                               <div key={ssIdx} style={{ position: 'relative' }}>

@@ -1,9 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import { Eye, EyeOff } from 'lucide-react';
 import Button from '../../components/ui/Button';
+import tablogo from '../../assets/tablogo.png';
 import './Auth.css';
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -50,8 +51,8 @@ export default function Login() {
       <div className="auth-card slide-up">
         <div className="auth-header">
           <div className="auth-logo">
-            <div className="brand-icon">A</div>
-            <span className="brand-name">AppDirect</span>
+            <img src={tablogo} alt="Darwinbox" className="brand-logo-img" />
+            <span className="brand-name">Darwinbox Marketplace</span>
           </div>
           <h1>Welcome back</h1>
           <p>Sign in to your account to continue</p>
@@ -100,10 +101,6 @@ export default function Login() {
             Sign In
           </Button>
         </form>
-
-        <p className="auth-footer-text">
-          Don't have an account? <Link to="/signup">Sign up</Link>
-        </p>
       </div>
     </div>
   );

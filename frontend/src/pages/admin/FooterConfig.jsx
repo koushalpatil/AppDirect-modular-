@@ -274,7 +274,10 @@ export default function FooterConfig() {
   };
 
   // ─── Bottom link helpers ────────────────────
-  const addBottomLink = () => setBottomLinks([...bottomLinks, emptyBottomLink()]);
+  const addBottomLink = () => {
+    if (bottomLinks.length >= 5) return toast.error('Maximum 5 links allowed in bottom bar');
+    setBottomLinks([...bottomLinks, emptyBottomLink()]);
+  };
   const removeBottomLink = (i) => setBottomLinks(bottomLinks.filter((_, idx) => idx !== i));
   const updateBottomLink = (i, key, val) => {
     const updated = [...bottomLinks];
@@ -497,9 +500,14 @@ export default function FooterConfig() {
                       value={sm.platform}
                       onChange={e => updateSocial(i, 'platform', e.target.value)}
                     >
-                      {PLATFORM_OPTIONS.map(p => (
-                        <option key={p.value} value={p.value}>{p.label}</option>
-                      ))}
+                      {PLATFORM_OPTIONS.map(p => {
+                        const isAlreadySelected = socialMedia.some((s, idx) => idx !== i && s.platform === p.value);
+                        return (
+                          <option key={p.value} value={p.value} disabled={isAlreadySelected}>
+                            {p.label}
+                          </option>
+                        );
+                      })}
                     </select>
                     <input
                       className="form-input"
@@ -549,8 +557,8 @@ export default function FooterConfig() {
                     <Link2 size={14} />
                     Bottom Footer Links
                   </h3>
-                  <button className="btn btn-sm btn-secondary" onClick={addBottomLink}>
-                    <Plus size={14} /> Add Link
+                  <button className="btn btn-sm btn-secondary" onClick={addBottomLink} disabled={bottomLinks.length >= 5}>
+                    <Plus size={14} /> {bottomLinks.length >= 5 ? 'Maximum 5 links' : 'Add Link'}
                   </button>
                 </div>
                 <div className="fc-bottom-body">

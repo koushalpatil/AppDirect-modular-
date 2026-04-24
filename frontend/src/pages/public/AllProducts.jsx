@@ -16,14 +16,10 @@ export default function AllProducts() {
   const [collapsedFilters, setCollapsedFilters] = useState({});
   const [viewMode, setViewMode] = useState('list');
   const [hideFilters, setHideFilters] = useState(false);
-  const [categoryProductsMap, setCategoryProductsMap] = useState({});
 
   // Derive these fresh from searchParams on every render
   const search = searchParams.get('search') || '';
-  const sort = searchParams.get('sort') || 'relevance';
-  const selectedProductIds = (searchParams.get('productIds') || '')
-    .split(',')
-    .filter(Boolean);
+  const sort = searchParams.get('sort') || 'newest';
 
   /** Parse attribute filters from URL — excludes meta keys */
   const getActiveFilters = useCallback(() => {
@@ -39,9 +35,7 @@ export default function AllProducts() {
 
   const activeFilters = getActiveFilters();
   const hasActiveFilters = Object.keys(activeFilters).length > 0;
-  const categoryFacet = facets.find((f) => (f.name || '').toLowerCase() === 'category');
-  const categoryAttrId = categoryFacet?._id?.toString();
-  const selectedCategories = categoryAttrId ? (activeFilters[categoryAttrId] || []) : [];
+  const activeFilterCount = Object.values(activeFilters).reduce((acc, vals) => acc + vals.length, 0);
 
   // ── Data fetching ──────────────────────────────────────────────────────────
   const loadData = useCallback(async () => {
@@ -49,7 +43,7 @@ export default function AllProducts() {
     // Re-read everything from searchParams here to avoid stale closure
     const currentSearch = searchParams.get('search') || '';
     const currentPage = parseInt(searchParams.get('page') || '1');
-    const currentSort = searchParams.get('sort') || 'relevance';
+    const currentSort = searchParams.get('sort') || 'newest';
     const currentProductIds = searchParams.get('productIds') || undefined;
     const filters = {};
     for (const [key, value] of searchParams.entries()) {
@@ -70,7 +64,7 @@ export default function AllProducts() {
           limit: 24,
           sort: currentSort,
         }),
-        productAPI.getFacets({ search: currentSearch, filters: filtersParam, productIds: currentProductIds }),
+        productAPI.getFacets(),
       ]);
       setProducts(prodRes.data.products || []);
       setPagination(prodRes.data.pagination || { total: 0, page: 1, pages: 1 });
@@ -86,65 +80,6 @@ export default function AllProducts() {
   useEffect(() => {
     loadData();
   }, [loadData]);
-
-  useEffect(() => {
-    if (!categoryAttrId || selectedCategories.length === 0) {
-      setCategoryProductsMap({});
-      return;
-    }
-
-    const loadCategoryProducts = async () => {
-      try {
-        const entries = await Promise.all(
-          selectedCategories.map(async (category) => {
-            const res = await productAPI.getByAttribute({
-              attributeId: categoryAttrId,
-              value: category,
-              limit: 200,
-            });
-            return [category, res.data.products || []];
-          })
-        );
-        setCategoryProductsMap(Object.fromEntries(entries));
-      } catch {
-        setCategoryProductsMap({});
-      }
-    };
-
-    loadCategoryProducts();
-  }, [categoryAttrId, selectedCategories.join('|')]);
-
-  useEffect(() => {
-    const params = new URLSearchParams(searchParams);
-    const currentIds = (params.get('productIds') || '').split(',').filter(Boolean);
-
-    if (currentIds.length === 0) return;
-
-    if (selectedCategories.length === 0) {
-      params.delete('productIds');
-      setSearchParams(params);
-      return;
-    }
-
-    const allowedIds = new Set(
-      selectedCategories.flatMap((category) =>
-        (categoryProductsMap[category] || []).map((p) => p._id)
-      )
-    );
-
-    if (allowedIds.size === 0) return;
-
-    const pruned = currentIds.filter((id) => allowedIds.has(id));
-    if (pruned.length !== currentIds.length) {
-      if (pruned.length > 0) {
-        params.set('productIds', pruned.join(','));
-      } else {
-        params.delete('productIds');
-      }
-      params.set('page', '1');
-      setSearchParams(params);
-    }
-  }, [searchParams, selectedCategories.join('|'), categoryProductsMap, setSearchParams]);
 
   // ── Filter actions ─────────────────────────────────────────────────────────
   const toggleFilterValue = (attrId, value) => {
@@ -166,48 +101,17 @@ export default function AllProducts() {
     setSearchParams(params);
   };
 
-  const removeFilterChip = (attrId, value) => {
-    if (attrId === 'productId') {
-      const params = new URLSearchParams(searchParams);
-      const current = (params.get('productIds') || '').split(',').filter(Boolean);
-      const updated = current.filter((id) => id !== value);
-      if (updated.length > 0) {
-        params.set('productIds', updated.join(','));
-      } else {
-        params.delete('productIds');
-      }
-      params.set('page', '1');
-      setSearchParams(params);
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams);
-    const current = params.get(attrId)?.split(',').filter(Boolean) || [];
-    const updated = current.filter((v) => v !== value);
-    if (updated.length === 0) {
-      params.delete(attrId);
-    } else {
-      params.set(attrId, updated.join(','));
-    }
-    params.set('page', '1');
-    setSearchParams(params);
-  };
-
   const clearAllFilters = () => {
     const params = new URLSearchParams();
     if (search) params.set('search', search);
-    if (sort && sort !== 'relevance') params.set('sort', sort);
+    if (sort) params.set('sort', sort);
     setSearchParams(params);
   };
 
   const handleSortChange = (e) => {
     const val = e.target.value;
     const params = new URLSearchParams(searchParams);
-    if (val === 'relevance') {
-      params.delete('sort');
-    } else {
-      params.set('sort', val);
-    }
+    params.set('sort', val);
     params.set('page', '1');
     setSearchParams(params);
   };
@@ -223,69 +127,20 @@ export default function AllProducts() {
     setCollapsedFilters((prev) => ({ ...prev, [attrId]: !prev[attrId] }));
   };
 
-  const toggleProductFilter = (productId) => {
-    const params = new URLSearchParams(searchParams);
-    const current = (params.get('productIds') || '').split(',').filter(Boolean);
-
-    if (current.includes(productId)) {
-      const updated = current.filter((id) => id !== productId);
-      if (updated.length > 0) {
-        params.set('productIds', updated.join(','));
-      } else {
-        params.delete('productIds');
-      }
-    } else {
-      params.set('productIds', [...current, productId].join(','));
-    }
-
-    params.set('page', '1');
-    setSearchParams(params);
-  };
-
-  // ── Active filter chips ────────────────────────────────────────────────────
-  // Build chip list from facets (so we have human-readable names)
-  const activeChips = [];
-  for (const facet of facets) {
-    const selected = activeFilters[facet._id] || [];
-    for (const val of selected) {
-      activeChips.push({ attrId: facet._id, attrName: facet.name, value: val });
-    }
-  }
-  // Also add chips for URL params that don't yet have a facet loaded (e.g. direct link)
-  for (const [attrId, vals] of Object.entries(activeFilters)) {
-    for (const val of vals) {
-      if (!activeChips.find((c) => c.attrId === attrId && c.value === val)) {
-        activeChips.push({ attrId, attrName: attrId, value: val });
-      }
-    }
-  }
-
-  for (const category of selectedCategories) {
-    const list = categoryProductsMap[category] || [];
-    for (const product of list) {
-      if (selectedProductIds.includes(product._id)) {
-        activeChips.push({
-          attrId: 'productId',
-          attrName: 'Product',
-          value: product._id,
-          label: product.name,
-        });
-      }
-    }
-  }
-
-  const primaryCategoryChip = activeChips.find((c) => c.attrName === 'Category') || activeChips[0];
   const breadcrumbText = search
     ? `Search: "${search}"`
-    : primaryCategoryChip
-    ? primaryCategoryChip.value
     : 'All Products';
 
   const pageTitle = search
     ? `Results for "${search}"`
-    : primaryCategoryChip
-    ? primaryCategoryChip.value
     : 'All Products';
+
+  const buildPageItems = (current, total) => {
+    if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+    if (current <= 3) return [1, 2, 3, 4, 5, 'ellipsis', total];
+    if (current >= total - 2) return [1, 'ellipsis', total - 4, total - 3, total - 2, total - 1, total];
+    return [1, 'ellipsis', current - 1, current, current + 1, 'ellipsis', total];
+  };
 
   return (
     <div
@@ -365,7 +220,7 @@ export default function AllProducts() {
                     marginLeft: '2px',
                   }}
                 >
-                  {activeChips.length}
+                  {activeFilterCount}
                 </span>
               )}
             </button>
@@ -398,7 +253,6 @@ export default function AllProducts() {
                   cursor: 'pointer',
                 }}
               >
-                <option value="relevance">Relevance</option>
                 <option value="newest">Newest</option>
                 <option value="alphabetical">A – Z</option>
               </select>
@@ -489,7 +343,7 @@ export default function AllProducts() {
                         padding: '1px 8px',
                       }}
                     >
-                      {activeChips.length}
+                      {activeFilterCount}
                     </span>
                   )}
                 </h3>
@@ -512,7 +366,6 @@ export default function AllProducts() {
 
               {facets.map((facet) => {
                 const selectedVals = activeFilters[facet._id] || [];
-                const isCategoryFacet = (facet.name || '').toLowerCase() === 'category';
                 return (
                   <div
                     key={facet._id}
@@ -582,49 +435,6 @@ export default function AllProducts() {
                                     {opt}
                                   </span>
                                 </label>
-
-                                {isCategoryFacet && isSelected && (
-                                  <div style={{ marginLeft: '26px', marginTop: '2px', marginBottom: '6px' }}>
-                                    {(categoryProductsMap[opt] || []).length > 0 ? (
-                                      (categoryProductsMap[opt] || []).map((product) => {
-                                        const checked = selectedProductIds.includes(product._id);
-                                        return (
-                                          <label
-                                            key={product._id}
-                                            className="ap-filter-option"
-                                            style={{ padding: '2px 0', cursor: 'pointer' }}
-                                          >
-                                            <input
-                                              type="checkbox"
-                                              checked={checked}
-                                              onChange={() => toggleProductFilter(product._id)}
-                                              style={{
-                                                width: '14px',
-                                                height: '14px',
-                                                borderRadius: '4px',
-                                                accentColor: '#111827',
-                                                cursor: 'pointer',
-                                              }}
-                                            />
-                                            <span
-                                              style={{
-                                                fontSize: '13px',
-                                                color: checked ? '#111827' : '#4b5563',
-                                                fontWeight: checked ? '600' : '400',
-                                              }}
-                                            >
-                                              {product.name}
-                                            </span>
-                                          </label>
-                                        );
-                                      })
-                                    ) : (
-                                      <span style={{ fontSize: 12, color: '#9ca3af', padding: '2px 0', display: 'block' }}>
-                                        No products in this category
-                                      </span>
-                                    )}
-                                  </div>
-                                )}
                               </div>
                             );
                           })
@@ -692,37 +502,50 @@ export default function AllProducts() {
 
                 {/* Pagination */}
                 {pagination.pages > 1 && (
-                  <div className="ap-pagination">
+                  <div className="ap-pagination" style={{ gap: '14px' }}>
                     <button
                       className="ap-page-btn"
                       disabled={pagination.page <= 1}
                       onClick={() => goToPage(pagination.page - 1)}
+                      aria-label="Previous page"
                     >
-                      ← Previous
+                      &lsaquo;
                     </button>
-                    {Array.from({ length: Math.min(pagination.pages, 7) }, (_, i) => {
-                      const start = Math.max(
-                        1,
-                        Math.min(pagination.page - 3, pagination.pages - 6)
-                      );
-                      const p = start + i;
-                      if (p > pagination.pages) return null;
+
+                    {buildPageItems(pagination.page, pagination.pages).map((item, idx) => {
+                      if (item === 'ellipsis') {
+                        return (
+                          <button key={`ellipsis-${idx}`} className="ap-page-btn" disabled>
+                            ...
+                          </button>
+                        );
+                      }
                       return (
                         <button
-                          key={p}
-                          className={`ap-page-btn ${p === pagination.page ? 'active' : ''}`}
-                          onClick={() => goToPage(p)}
+                          key={item}
+                          className={`ap-page-btn ${item === pagination.page ? 'active' : ''}`}
+                          onClick={() => goToPage(item)}
                         >
-                          {p}
+                          {item}
                         </button>
                       );
                     })}
+
                     <button
                       className="ap-page-btn"
                       disabled={pagination.page >= pagination.pages}
                       onClick={() => goToPage(pagination.page + 1)}
+                      aria-label="Next page"
                     >
-                      Next →
+                      &rsaquo;
+                    </button>
+
+                    <button
+                      className="ap-page-btn"
+                      onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+                      style={{ marginLeft: '8px', background: '#111827', color: '#fff', borderColor: '#111827' }}
+                    >
+                      Back to top
                     </button>
                   </div>
                 )}

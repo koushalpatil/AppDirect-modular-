@@ -35,6 +35,7 @@ export default function PublicLayout() {
   const [categoryAttrId, setCategoryAttrId] = useState(null);
   const [hoveredCategory, setHoveredCategory] = useState(null);
   const [categoryProducts, setCategoryProducts] = useState([]);
+  const [allProducts, setAllProducts] = useState([]);
   const [megaMenuOpen, setMegaMenuOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -75,6 +76,15 @@ export default function PublicLayout() {
     }
   };
 
+  const loadAllProducts = async () => {
+    try {
+      const res = await productAPI.getPublished({ page: 1, limit: 12, sort: 'newest' });
+      setAllProducts(res.data.products || []);
+    } catch {
+      setAllProducts([]);
+    }
+  };
+
   const handleCategoryHover = async (category) => {
     setHoveredCategory(category);
     if (!categoryAttrId) return;
@@ -86,9 +96,19 @@ export default function PublicLayout() {
     }
   };
 
+  const handleViewAllHover = async () => {
+    setHoveredCategory(null);
+    if (allProducts.length === 0) {
+      await loadAllProducts();
+    }
+  };
+
   const handleMegaEnter = () => {
     clearTimeout(timeoutRef.current);
     setMegaMenuOpen(true);
+    if (allProducts.length === 0) {
+      loadAllProducts();
+    }
   };
 
   const handleMegaLeave = () => {
@@ -188,10 +208,7 @@ export default function PublicLayout() {
                 </button>
               </div>
             ) : (
-              <div className="pub-auth-area">
-                <Link to="/login" className="pub-top-link">Log In</Link>
-                <Link to="/signup" className="pub-top-link pub-signup-btn">Sign Up</Link>
-              </div>
+              null
             )}
           </div>
         </div>
@@ -214,7 +231,12 @@ export default function PublicLayout() {
                 <div className="pub-mega-menu">
                   {/* ... mega menu content ... */}
                   <div className="pub-mega-cats">
-                    <Link to="/products" className="pub-mega-view-all" onClick={() => setMegaMenuOpen(false)}>
+                    <Link
+                      to="/products"
+                      className="pub-mega-view-all"
+                      onMouseEnter={handleViewAllHover}
+                      onClick={() => setMegaMenuOpen(false)}
+                    >
                       View All
                     </Link>
                     {categories.map(cat => (
@@ -268,16 +290,38 @@ export default function PublicLayout() {
                         )}
                       </>
                     ) : (
-                      <div className="pub-mega-placeholder">
-                        <p>Hover over a category to see products</p>
-                      </div>
+                      <>
+                        <Link to="/products" className="pub-mega-view-all-right" onClick={() => setMegaMenuOpen(false)}>
+                          View All
+                        </Link>
+                        {allProducts.length > 0 ? (
+                          <div className="pub-mega-grid">
+                            {allProducts.map((p) => (
+                              <Link
+                                key={p._id}
+                                to={`/products/${p._id}`}
+                                className="pub-mega-item"
+                                onClick={() => setMegaMenuOpen(false)}
+                              >
+                                {p.logo && <img src={p.logo} alt={p.name} className="pub-mega-logo" />}
+                                <div>
+                                  <span className="pub-mega-name">{p.name}</span>
+                                  {p.tagline && <span className="pub-mega-tagline">{p.tagline}</span>}
+                                </div>
+                              </Link>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="pub-mega-empty">No products available</p>
+                        )}
+                      </>
                     )}
                   </div>
                 </div>
               )}
             </div>
 
-            <Link to="/my-apps" className="pub-nav-trigger">
+            <Link to={user ? '/my-apps' : '/login'} className="pub-nav-trigger">
               My Apps
             </Link>
           </div>
@@ -287,7 +331,7 @@ export default function PublicLayout() {
               <input
                 type="text"
                 className="pub-search-input"
-                placeholder="Search Products"
+                placeholder="Search by product name, tagline, or tags"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 maxLength={100}
