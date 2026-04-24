@@ -557,47 +557,6 @@ exports.getUserApps = async (req, res) => {
   }
 };
 
-// Admin: Get similarity settings
-exports.getSimilarityConfig = async (req, res) => {
-  try {
-    let config = await ContentConfig.findOne({ type: 'similarity_settings' });
-    if (!config) {
-      config = await ContentConfig.create({
-        type: 'similarity_settings',
-        minSimilarityScore: 0.2,
-        maxResults: 5,
-      });
-    }
-    res.json({ config });
-  } catch (error) {
-    console.error('Get similarity config error:', error);
-    res.status(500).json({ message: 'Failed to retrieve similarity settings.' });
-  }
-};
-
-// Admin: Update similarity settings
-exports.updateSimilarityConfig = async (req, res) => {
-  try {
-    const { minSimilarityScore, maxResults, fallbackAttributeId } = req.body;
-
-    const config = await ContentConfig.findOneAndUpdate(
-      { type: 'similarity_settings' },
-      {
-        minSimilarityScore: minSimilarityScore !== undefined ? Number(minSimilarityScore) : 0.2,
-        maxResults: maxResults !== undefined ? Number(maxResults) : 5,
-        fallbackAttributeId: fallbackAttributeId || null,
-        updatedBy: req.user?._id,
-      },
-      { new: true, upsert: true }
-    );
-
-    res.json({ message: 'Similarity settings updated successfully.', config });
-  } catch (error) {
-    console.error('Update similarity config error:', error);
-    res.status(500).json({ message: 'Failed to update similarity settings.' });
-  }
-};
-
 // ─── Footer Config ───────────────────────────────────────────────────────────
 
 const VALID_PLATFORMS = new Set(['facebook', 'x', 'instagram', 'linkedin', 'youtube']);

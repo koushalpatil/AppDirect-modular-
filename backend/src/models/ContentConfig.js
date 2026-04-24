@@ -77,7 +77,7 @@ const bottomFooterLinkSchema = new mongoose.Schema({
 const contentConfigSchema = new mongoose.Schema({
   type: {
     type: String,
-    enum: ['contact_form', 'homepage', 'similarity_settings', 'footer'],
+    enum: ['contact_form', 'homepage', 'footer'],
     required: true,
     unique: true,
   },
@@ -89,11 +89,6 @@ const contentConfigSchema = new mongoose.Schema({
   heroImage: { type: String },
   slidingImages: [{ type: String }],
   homepageCategories: [homepageCategorySchema],
-
-  // Similarity settings
-  minSimilarityScore: { type: Number, default: 0.2, min: 0, max: 1 },
-  maxResults: { type: Number, default: 5, min: 1, max: 20 },
-  fallbackAttributeId: { type: mongoose.Schema.Types.ObjectId, ref: 'Attribute' },
 
   // Footer config
   footerSections: { type: [footerSectionSchema], default: [], validate: [v => v.length <= 2, 'Max 2 footer sections'] },

@@ -10,8 +10,6 @@ const {
   getPublicHomepage,
   getPublicContactForm,
   submitPublicContactForm,
-  getSimilarityConfig,
-  updateSimilarityConfig,
   getFooterConfig,
   updateFooterConfig,
   getPublicFooter,
@@ -30,8 +28,6 @@ router.get('/contact', auth, adminOnly, getContactConfig);
 router.put('/contact', auth, adminOnly, updateContactConfig);
 router.get('/homepage', auth, adminOnly, getHomepageConfig);
 router.put('/homepage', auth, adminOnly, updateHomepageConfig);
-router.get('/similarity', auth, adminOnly, getSimilarityConfig);
-router.put('/similarity', auth, adminOnly, updateSimilarityConfig);
 router.get('/footer', auth, adminOnly, getFooterConfig);
 router.put('/footer', auth, adminOnly, updateFooterConfig);
 

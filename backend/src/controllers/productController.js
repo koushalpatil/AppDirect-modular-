@@ -49,10 +49,56 @@ const toComparableValue = (value) => {
   ));
 };
 
+const normalizeValue = (value) => {
+  if (value === null || value === undefined) return '';
+  return String(value).trim().toLowerCase();
+};
+
 const areValuesEqual = (a, b) => {
   const left = toComparableValue(a);
   const right = toComparableValue(b);
   return JSON.stringify(left) === JSON.stringify(right);
+};
+
+const getAttributeValueMap = (attributes) => {
+  const map = new Map();
+
+  (attributes || []).forEach((attribute) => {
+    const attributeId = attribute?.attributeId?._id?.toString?.() || attribute?.attributeId?.toString?.();
+    if (!attributeId) return;
+
+    const values = Array.isArray(attribute.values) ? attribute.values : [];
+    map.set(attributeId, new Set(values.map(normalizeValue).filter(Boolean)));
+  });
+
+  return map;
+};
+
+const hasMatchingAttributeValues = (leftValues, rightValues) => {
+  if (!leftValues || !rightValues) return false;
+  for (const value of leftValues) {
+    if (rightValues.has(value)) return true;
+  }
+  return false;
+};
+
+const getSimilarityScore = (currentProduct, candidateProduct) => {
+  const currentAttributeMap = getAttributeValueMap(currentProduct.attributes);
+  const candidateAttributeMap = getAttributeValueMap(candidateProduct.attributes);
+
+  let matchingAttributesCount = 0;
+
+  for (const [attributeId, currentValues] of currentAttributeMap.entries()) {
+    const candidateValues = candidateAttributeMap.get(attributeId);
+    if (hasMatchingAttributeValues(currentValues, candidateValues)) {
+      matchingAttributesCount += 1;
+    }
+  }
+
+  const sameDeveloper = normalizeValue(currentProduct.developerName) &&
+    normalizeValue(currentProduct.developerName) === normalizeValue(candidateProduct.developerName);
+
+  return (matchingAttributesCount * 2) + (sameDeveloper ? 3 : 0);
 };
 
 /**
@@ -624,101 +670,21 @@ exports.getPublicProduct = async (req, res) => {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    // --- DYNAMIC SIMILARITY ENGINE ---
-    // 1. Get global similarity settings
-    const ContentConfig = require('../models/ContentConfig');
-    const similarityConfig = await ContentConfig.findOne({ type: 'similarity_settings' }) || {
-      minSimilarityScore: 0.2,
-      maxResults: 5,
-    };
-
-    // 2. Get attributes configured for similarity
-    const similarityAttributes = await Attribute.find({ 'similarity.useInSimilarity': true });
-    
-    // 3. Get all published products (excluding current)
     const allPublished = await Product.find({ _id: { $ne: product._id }, status: 'published' })
-      .populate('attributes.attributeId', 'name similarity')
+      .populate('attributes.attributeId', 'name')
       .lean();
 
-    // 4. Map target product attributes for easy lookup
-    const targetAttrMap = {};
-    (product.attributes || []).forEach(attr => {
-      const attrId = attr.attributeId?._id?.toString() || attr.attributeId?.toString();
-      if (attrId) targetAttrMap[attrId] = attr.values || [];
-    });
-
-    // 5. Scoring Loop
-    const scoredProducts = allPublished.map(p => {
-      let score = 0;
-      let totalPossibleWeight = 0;
-
-      similarityAttributes.forEach(attr => {
-        const attrId = attr._id.toString();
-        const targetValues = targetAttrMap[attrId] || [];
-        const pAttr = (p.attributes || []).find(a => (a.attributeId?._id?.toString() || a.attributeId?.toString()) === attrId);
-        const pValues = pAttr ? (pAttr.values || []) : [];
-        
-        const weight = attr.similarity?.weight || 1;
-        totalPossibleWeight += weight;
-
-        if (targetValues.length > 0 && pValues.length > 0) {
-          const matchType = attr.similarity?.matchType || 'exact';
-          let matched = false;
-
-          if (matchType === 'exact') {
-            // Arrays are same or target is subset
-            matched = targetValues.length === pValues.length && targetValues.every(v => pValues.includes(v));
-          } else if (matchType === 'overlap') {
-            matched = targetValues.some(v => pValues.includes(v));
-          } else if (matchType === 'partial') {
-            matched = targetValues.some(v1 => pValues.some(v2 => 
-              v1.toLowerCase().includes(v2.toLowerCase()) || v2.toLowerCase().includes(v1.toLowerCase())
-            ));
-          }
-
-          if (matched) {
-            score += weight;
-          }
-        }
+    const scoredProducts = allPublished
+      .map((candidate) => ({
+        product: candidate,
+        score: getSimilarityScore(product, candidate),
+      }))
+      .sort((a, b) => {
+        if (b.score !== a.score) return b.score - a.score;
+        return new Date(b.product.createdAt) - new Date(a.product.createdAt);
       });
 
-      // Normalize score (0 to 1)
-      const normalizedScore = totalPossibleWeight > 0 ? score / totalPossibleWeight : 0;
-      
-      // Fallback check: does it match the fallback attribute?
-      let isFallbackMatch = false;
-      if (similarityConfig.fallbackAttributeId) {
-        const fallId = similarityConfig.fallbackAttributeId.toString();
-        const targetFallValues = targetAttrMap[fallId] || [];
-        const pFallAttr = (p.attributes || []).find(a => (a.attributeId?._id?.toString() || a.attributeId?.toString()) === fallId);
-        const pFallValues = pFallAttr ? (pFallAttr.values || []) : [];
-        isFallbackMatch = targetFallValues.length > 0 && pFallValues.some(v => targetFallValues.includes(v));
-      }
-
-      return { product: p, score: normalizedScore, isFallbackMatch };
-    });
-
-    // 6. Filtering & Ranking
-    // Threshold filtering
-    let filtered = scoredProducts.filter(sp => sp.score >= (similarityConfig.minSimilarityScore || 0.2));
-
-    // Fallback logic if results are low
-    const maxRes = similarityConfig.maxResults || 5;
-    if (filtered.length < maxRes && similarityConfig.fallbackAttributeId) {
-      const fallbackResults = scoredProducts
-        .filter(sp => sp.isFallbackMatch && !filtered.find(f => f.product._id.toString() === sp.product._id.toString()))
-        .sort((a, b) => b.score - a.score);
-      
-      filtered = [...filtered, ...fallbackResults];
-    }
-
-    // Final Sort: Score DESC, then newest
-    filtered.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
-      return new Date(b.product.createdAt) - new Date(a.product.createdAt);
-    });
-
-    const similarProducts = filtered.slice(0, maxRes).map(sp => sp.product);
+    const similarProducts = scoredProducts.slice(0, 5).map(item => item.product);
 
     res.json({ product, similarProducts });
   } catch (error) {
