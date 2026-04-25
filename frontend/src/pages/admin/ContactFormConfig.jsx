@@ -23,6 +23,10 @@ export default function ContactFormConfig() {
   // Preview modal
   const [previewFields, setPreviewFields] = useState(null);
 
+  // Delete confirmation (replaces browser alert)
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   const loadTemplates = useCallback(async () => {
     try {
       const res = await configAPI.getContactTemplates();
@@ -112,14 +116,22 @@ export default function ContactFormConfig() {
     }
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm('Delete this template? Products using it will lose their contact form.')) return;
+  const requestDeleteTemplate = (tmpl) => {
+    setDeleteTarget({ id: tmpl._id, name: tmpl.name });
+  };
+
+  const confirmDeleteTemplate = async () => {
+    if (!deleteTarget) return;
+    setDeleteLoading(true);
     try {
-      await configAPI.deleteContactTemplate(id);
+      await configAPI.deleteContactTemplate(deleteTarget.id);
       toast.success('Template deleted.');
+      setDeleteTarget(null);
       loadTemplates();
     } catch {
       toast.error('Failed to delete template.');
+    } finally {
+      setDeleteLoading(false);
     }
   };
 
@@ -201,9 +213,10 @@ export default function ContactFormConfig() {
                     <Eye size={13} /> Preview
                   </button>
                   <button
+                    type="button"
                     className="btn btn-secondary btn-sm"
                     style={{ color: '#ef4444' }}
-                    onClick={() => handleDelete(tmpl._id)}
+                    onClick={() => requestDeleteTemplate(tmpl)}
                     title="Delete"
                   >
                     <Trash2 size={13} />
@@ -261,6 +274,46 @@ export default function ContactFormConfig() {
               <button className="btn btn-secondary" onClick={() => setEditingTemplate(null)}>Cancel</button>
               <button className="btn btn-primary" onClick={handleSaveTemplate} disabled={savingTemplate}>
                 {savingTemplate ? 'Saving…' : editingTemplate._id ? 'Update Template' : 'Create Template'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Delete confirmation ───────────────────────────────────────────── */}
+      {deleteTarget && (
+        <div className="modal-overlay" onClick={() => !deleteLoading && setDeleteTarget(null)}>
+          <div className="modal" style={{ maxWidth: 420 }} onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Delete template?</h3>
+              <button
+                type="button"
+                className="btn btn-icon btn-ghost"
+                onClick={() => !deleteLoading && setDeleteTarget(null)}
+                disabled={deleteLoading}
+                aria-label="Close"
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body">
+              <p className="text-muted" style={{ fontSize: 14, lineHeight: 1.55, margin: 0 }}>
+                <strong style={{ color: '#0f172a' }}>{deleteTarget.name}</strong> will be removed permanently.
+                Products that still reference this template will no longer have a contact form until you assign a different template.
+              </p>
+            </div>
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="btn btn-primary"
+                style={{ background: '#dc2626', borderColor: '#dc2626' }}
+                onClick={confirmDeleteTemplate}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? 'Deleting…' : 'Delete template'}
               </button>
             </div>
           </div>
