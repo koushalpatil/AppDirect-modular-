@@ -327,20 +327,26 @@ exports.updateHomepageConfig = async (req, res) => {
   try {
     const { heroImage, slidingImages, homepageCategories } = req.body;
 
-    let config = await ContentConfig.findOne({ type: 'homepage' });
-    if (!config) {
-      config = new ContentConfig({ type: 'homepage' });
-    }
+    const $set = { updatedBy: req.user._id };
+    if (heroImage !== undefined) $set.heroImage = heroImage;
+    if (slidingImages !== undefined) $set.slidingImages = slidingImages;
+    if (homepageCategories !== undefined) $set.homepageCategories = homepageCategories;
 
-    if (heroImage !== undefined) config.heroImage = heroImage;
-    if (slidingImages !== undefined) config.slidingImages = slidingImages;
-    if (homepageCategories !== undefined) config.homepageCategories = homepageCategories;
-    config.updatedBy = req.user._id;
-    await config.save();
-
-    // Re-fetch with populated products
-    config = await ContentConfig.findOne({ type: 'homepage' })
-      .populate('homepageCategories.products', 'name tagline logo status');
+    // Partial update only — avoids validating unrelated paths (e.g. legacy footerSections on the
+    // homepage document) that would break save() on the shared ContentConfig schema.
+    const config = await ContentConfig.findOneAndUpdate(
+      { type: 'homepage' },
+      {
+        $set,
+        $setOnInsert: {
+          type: 'homepage',
+          heroImage: '',
+          slidingImages: [],
+          homepageCategories: [],
+        },
+      },
+      { new: true, upsert: true, runValidators: true },
+    ).populate('homepageCategories.products', 'name tagline logo status');
 
     res.json({ message: 'Homepage configuration updated.', config });
   } catch (error) {

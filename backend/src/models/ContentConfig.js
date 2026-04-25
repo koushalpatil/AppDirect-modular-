@@ -91,7 +91,19 @@ const contentConfigSchema = new mongoose.Schema({
   homepageCategories: [homepageCategorySchema],
 
   // Footer config
-  footerSections: { type: [footerSectionSchema], default: [], validate: [v => v.length <= 3, 'Max 3 footer sections'] },
+  footerSections: {
+    type: [footerSectionSchema],
+    default: [],
+    validate: {
+      validator(v) {
+        // Only enforce footer layout limits on the footer config document — homepage/contact
+        // docs share this schema path and must not fail save when unrelated data exists.
+        if (this.get('type') !== 'footer') return true;
+        return !v || v.length <= 3;
+      },
+      message: 'Max 3 footer sections',
+    },
+  },
   footerContent: { type: footerContentSchema, default: () => ({}) },
   socialMedia: { type: [socialMediaSchema], default: [] },
   bottomFooterLinks: { type: [bottomFooterLinkSchema], default: [] },
