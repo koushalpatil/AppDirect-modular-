@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productAPI, configAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { X } from 'lucide-react';
+import { X, AlertCircle } from 'lucide-react';
 import './Public.css'; // Will use pub-modal CSS classes for styling
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
@@ -32,9 +32,10 @@ export default function ProductContact() {
   const [fields, setFields] = useState([]);
   const [formValues, setFormValues] = useState({});
   const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
+  const [hasTemplate, setHasTemplate] = useState(true);
 
   const loadData = useCallback(async () => {
     try {
@@ -43,7 +44,16 @@ export default function ProductContact() {
         productAPI.getPublicContactForm(id),
       ]);
 
-      const configuredFields = (formRes.data.fields || [])
+      const { fields: rawFields, hasTemplate: templateExists } = formRes.data;
+      setHasTemplate(templateExists);
+
+      if (!templateExists) {
+        setProduct(productRes.data.product);
+        setLoading(false);
+        return;
+      }
+
+      const configuredFields = (rawFields || [])
         .filter((field) => !isPublicExcludedField(field))
         .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 
@@ -330,6 +340,21 @@ export default function ProductContact() {
             <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>Thank you for reaching out!</h2>
             <p style={{ color: '#64748b', fontSize: 16, marginBottom: 32, maxWidth: 400, margin: '0 auto 32px' }}>
               We have received your details. A representative will be in touch with you shortly.
+            </p>
+            <button 
+              onClick={() => navigate(`/products/${id}`)}
+              style={{ background: '#0183FF', color: '#fff', padding: '12px 32px', border: 'none', borderRadius: '8px', fontWeight: 'bold', cursor: 'pointer', fontSize: '15px' }}>
+              Return to Product
+            </button>
+          </div>
+        ) : !hasTemplate ? (
+          <div style={{ padding: '64px 32px', textAlign: 'center' }}>
+            <div style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: 64, height: 64, borderRadius: '50%', background: '#f1f5f9', color: '#64748b', marginBottom: 24 }}>
+              <AlertCircle size={32} />
+            </div>
+            <h2 style={{ fontSize: 24, fontWeight: 800, color: '#0f172a', marginBottom: 12 }}>No Form Configured</h2>
+            <p style={{ color: '#64748b', fontSize: 16, marginBottom: 32, maxWidth: 400, margin: '0 auto 32px' }}>
+              This product does not have a contact form enabled at the moment.
             </p>
             <button 
               onClick={() => navigate(`/products/${id}`)}

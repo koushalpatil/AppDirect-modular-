@@ -60,6 +60,7 @@ export default function PublicLayout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
   const [openMenu, setOpenMenu] = useState(null);
   const dropdownRef = useRef(null);
   const topMenuRef = useRef(null);
@@ -178,18 +179,23 @@ export default function PublicLayout() {
     if (searchTimeoutRef.current) clearTimeout(searchTimeoutRef.current);
 
     if (val.trim().length > 1) {
+      setIsSearching(true);
+      setShowSuggestions(true);
       searchTimeoutRef.current = setTimeout(async () => {
         try {
           const res = await productAPI.search({ search: val, limit: 5 });
           setSuggestions(res.data.products || []);
-          setShowSuggestions(true);
         } catch (err) {
           console.error(err);
+          setSuggestions([]);
+        } finally {
+          setIsSearching(false);
         }
       }, 300);
     } else {
       setSuggestions([]);
       setShowSuggestions(false);
+      setIsSearching(false);
     }
   };
 
@@ -400,12 +406,12 @@ export default function PublicLayout() {
               <input
                 type="text"
                 className="pub-search-input"
-                placeholder="Search by product name, tagline, or tags"
+                placeholder="Search by product name, tagline, or developer"
                 value={searchQuery}
                 onChange={handleSearchChange}
                 maxLength={100}
                 onFocus={() => {
-                  if (suggestions.length > 0) setShowSuggestions(true);
+                  if (suggestions.length > 0 || isSearching) setShowSuggestions(true);
                 }}
               />
               <button type="submit" className="pub-search-btn">
@@ -413,26 +419,32 @@ export default function PublicLayout() {
               </button>
             </form>
 
-            {showSuggestions && suggestions.length > 0 && (
+            {showSuggestions && (
               <div className="pub-search-suggestions">
-                {suggestions.map(p => (
-                  <Link
-                    key={p._id}
-                    to={`/products/${p._id}`}
-                    className="pub-suggestion-item"
-                    onClick={() => setShowSuggestions(false)}
-                  >
-                    {p.logo ? (
-                      <img src={p.logo} alt={p.name} className="pub-suggestion-logo" />
-                    ) : (
-                      <div className="pub-suggestion-logo-placeholder">{p.name?.[0]}</div>
-                    )}
-                    <div className="pub-suggestion-details">
-                      <div className="pub-suggestion-name">{p.name}</div>
-                      {p.tagline && <div className="pub-suggestion-tagline">{p.tagline}</div>}
-                    </div>
-                  </Link>
-                ))}
+                {isSearching ? (
+                  <div className="pub-suggestion-status">Searching…</div>
+                ) : suggestions.length > 0 ? (
+                  suggestions.map(p => (
+                    <Link
+                      key={p._id}
+                      to={`/products/${p._id}`}
+                      className="pub-suggestion-item"
+                      onClick={() => setShowSuggestions(false)}
+                    >
+                      {p.logo ? (
+                        <img src={p.logo} alt={p.name} className="pub-suggestion-logo" />
+                      ) : (
+                        <div className="pub-suggestion-logo-placeholder">{p.name?.[0]}</div>
+                      )}
+                      <div className="pub-suggestion-details">
+                        <div className="pub-suggestion-name">{p.name}</div>
+                        {p.tagline && <div className="pub-suggestion-tagline">{p.tagline}</div>}
+                      </div>
+                    </Link>
+                  ))
+                ) : (
+                  <div className="pub-suggestion-status">No results found</div>
+                )}
               </div>
             )}
           </div>

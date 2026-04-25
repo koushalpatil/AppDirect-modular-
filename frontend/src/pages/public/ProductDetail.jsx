@@ -142,12 +142,45 @@ export default function ProductDetail() {
             <div className="pd-block-text" style={{ width: '100%' }}>
               <h3 className="pd-block-title">Product Resources</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '16px' }}>
-                {product.resources.map((res, i) => (
-                  <a key={i} href={res.url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '12px', padding: '16px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px', textDecoration: 'none', color: '#0f172a', fontWeight: '500' }}>
-                     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#0183FF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="12" y1="18" x2="12" y2="12"></line><line x1="9" y1="15" x2="15" y2="15"></line></svg>
-                     {res.name}
-                  </a>
-                ))}
+                <div className="pd-resources-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: '16px', marginTop: '24px' }}>
+                  {product.resources.map((res, i) => (
+                    <div key={i} className="pd-resource-card" style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '20px', background: '#fff', border: '1px solid #e2e8f0', borderRadius: '12px', transition: 'transform 0.2s, box-shadow 0.2s' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                        <div style={{ width: '40px', height: '40px', background: '#f0f9ff', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#0183FF' }}>
+                          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontWeight: '600', color: '#0f172a', fontSize: '14px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }} title={res.name}>{res.name}</div>
+                          <div style={{ fontSize: '12px', color: '#64748b', marginTop: '2px' }}>Document</div>
+                        </div>
+                      </div>
+                      <a 
+                        href={res.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="pd-resource-download-btn"
+                        style={{ 
+                          display: 'flex', 
+                          alignItems: 'center', 
+                          justifyContent: 'center', 
+                          gap: '8px', 
+                          padding: '10px', 
+                          background: '#f8fafc', 
+                          color: '#0183FF', 
+                          borderRadius: '8px', 
+                          fontSize: '13px', 
+                          fontWeight: '600', 
+                          textDecoration: 'none',
+                          border: '1px solid #e2e8h0',
+                          transition: 'background 0.2s'
+                        }}
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                        Download
+                      </a>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
           </div>

@@ -548,6 +548,14 @@
   text-overflow: ellipsis;
 }
 
+.pub-suggestion-status {
+  padding: 14px 16px;
+  text-align: center;
+  font-size: 13px;
+  color: #64748b;
+  font-weight: 500;
+}
+
 /* ============ MAIN ============ */
 
 .pub-main {

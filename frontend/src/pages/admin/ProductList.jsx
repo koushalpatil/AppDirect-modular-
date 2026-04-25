@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { productAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -13,6 +13,13 @@ export default function ProductList() {
   const [deleteTarget, setDeleteTarget] = useState(null);
   const navigate = useNavigate();
 
+  // Auto-suggestion state
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [isSearching, setIsSearching] = useState(false);
+  const suggestTimeoutRef = useRef(null);
+  const searchWrapperRef = useRef(null);
+
   useEffect(() => { 
     loadProducts(); 
   }, [statusFilter]);
@@ -24,6 +31,17 @@ export default function ProductList() {
     }, 400); // Slightly longer debounce for full table refresh
     return () => clearTimeout(timer);
   }, [search]);
+
+  // Click outside to close suggestions
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (searchWrapperRef.current && !searchWrapperRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadProducts = async (currentSearch = search) => {
     try {
@@ -40,10 +58,38 @@ export default function ProductList() {
     }
   };
 
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearch(val);
+
+    if (suggestTimeoutRef.current) clearTimeout(suggestTimeoutRef.current);
+
+    if (val.trim().length > 1) {
+      setIsSearching(true);
+      setShowSuggestions(true);
+      suggestTimeoutRef.current = setTimeout(async () => {
+        try {
+          const res = await productAPI.getAll({ search: val.trim(), limit: 5 });
+          setSuggestions(res.data.products || []);
+        } catch {
+          setSuggestions([]);
+        } finally {
+          setIsSearching(false);
+        }
+      }, 300);
+    } else {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      setIsSearching(false);
+    }
+  };
+
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    setShowSuggestions(false);
     loadProducts();
   };
+
 
   const handleDelete = async (id, name) => {
     try {
@@ -77,19 +123,56 @@ export default function ProductList() {
         </div>
       </div>
 
-      <div style={{ marginBottom: '1.5rem', maxWidth: 600 }}>
+      <div style={{ marginBottom: '1.5rem', maxWidth: 600, position: 'relative' }} ref={searchWrapperRef}>
         <form onSubmit={handleSearchSubmit} className="search-bar" style={{ marginBottom: 0 }}>
           <input
             type="text"
             className="form-input"
             placeholder="Search products by name, tagline, or developer..."
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={handleSearchChange}
+            onFocus={() => {
+              if (suggestions.length > 0 || isSearching) setShowSuggestions(true);
+            }}
           />
           <button type="submit" className="btn btn-secondary">
             <Search size={16} />
           </button>
         </form>
+
+        {showSuggestions && (
+          <div className="admin-search-suggestions">
+            {isSearching ? (
+              <div className="admin-suggestion-status">Searching…</div>
+            ) : suggestions.length > 0 ? (
+              suggestions.map(p => (
+                <div
+                  key={p._id}
+                  className="admin-suggestion-item"
+                  onClick={() => {
+                    setShowSuggestions(false);
+                    navigate(`/admin/products/${p._id}/edit`);
+                  }}
+                >
+                  {p.logo ? (
+                    <img src={p.logo} alt={p.name} className="admin-suggestion-logo" />
+                  ) : (
+                    <div className="admin-suggestion-logo-placeholder">{p.name?.[0]}</div>
+                  )}
+                  <div className="admin-suggestion-details">
+                    <div className="admin-suggestion-name">{p.name}</div>
+                    {p.tagline && <div className="admin-suggestion-tagline">{p.tagline}</div>}
+                  </div>
+                  <span className={`badge ${p.status === 'published' ? 'badge-success' : 'badge-warning'}`} style={{ marginLeft: 'auto', flexShrink: 0 }}>
+                    {p.status}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="admin-suggestion-status">No results found</div>
+            )}
+          </div>
+        )}
       </div>
 
       <div className="filter-row">

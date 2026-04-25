@@ -21,6 +21,7 @@ export default function HomepageConfig() {
 
   // For add category form
   const [categoryTitle, setCategoryTitle] = useState('');
+  const [productSearch, setProductSearch] = useState('');
 
   useEffect(() => { loadAll(); }, []);
 
@@ -28,6 +29,7 @@ export default function HomepageConfig() {
     const handleClickOutside = (e) => {
       if (dropdownWrapperRef.current && !dropdownWrapperRef.current.contains(e.target)) {
         setOpenProductDropdownIdx(null);
+        setProductSearch('');
       }
     };
 
@@ -276,66 +278,112 @@ export default function HomepageConfig() {
             <div className="form-group" style={{ marginBottom: 0 }} ref={openProductDropdownIdx === catIdx ? dropdownWrapperRef : null}>
               {(() => {
                 const prodIds = cat.products.map(p => typeof p === 'string' ? p : p._id);
-                const selectedNames = allProducts.filter((p) => prodIds.includes(p._id)).map((p) => p.name);
-                return (
-                  <>
-                    <button
-                      type="button"
-                      className="form-select"
-                      onClick={() => setOpenProductDropdownIdx((prev) => (prev === catIdx ? null : catIdx))}
-                      style={{
-                        width: '100%',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'space-between',
-                        textAlign: 'left',
-                        cursor: 'pointer',
-                      }}
-                    >
-                      <span style={{ color: selectedNames.length ? '#0f172a' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {selectedNames.length ? selectedNames.join(', ') : 'Select one or more products'}
-                      </span>
-                      <ChevronDown size={14} style={{ color: '#64748b', flex: '0 0 auto' }} />
-                    </button>
+                const selectedProducts = allProducts.filter((p) => prodIds.includes(p._id));
+                const filteredProducts = allProducts.filter(p => 
+                  p.name.toLowerCase().includes(productSearch.toLowerCase()) && 
+                  !prodIds.includes(p._id)
+                ).slice(0, 50); // limit to 50 results for performance
 
-                    {openProductDropdownIdx === catIdx && (
+                return (
+                  <div style={{ position: 'relative' }}>
+                    {/* Search Input */}
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        className="form-input"
+                        placeholder="Search products to add..."
+                        value={openProductDropdownIdx === catIdx ? productSearch : ''}
+                        onChange={(e) => {
+                          setProductSearch(e.target.value);
+                          setOpenProductDropdownIdx(catIdx);
+                        }}
+                        onFocus={() => {
+                          setOpenProductDropdownIdx(catIdx);
+                        }}
+                        style={{ paddingRight: '40px' }}
+                      />
+                      <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#94a3b8' }}>
+                        <ChevronDown size={14} />
+                      </div>
+                    </div>
+
+                    {/* Results Dropdown */}
+                    {openProductDropdownIdx === catIdx && productSearch.trim() !== '' && (
                       <div style={{
-                        marginTop: 8,
+                        position: 'absolute',
+                        top: '100%',
+                        left: 0,
+                        right: 0,
+                        marginTop: 4,
                         border: '1px solid #dbe3ef',
                         borderRadius: 10,
                         background: '#fff',
                         maxHeight: 260,
                         overflowY: 'auto',
-                        boxShadow: '0 14px 28px rgba(2, 6, 23, 0.08)',
+                        boxShadow: '0 14px 28px rgba(2, 6, 23, 0.12)',
                         padding: 6,
+                        zIndex: 100,
                       }}>
-                        {allProducts.map((prod) => {
-                          const isSelected = prodIds.includes(prod._id);
-                          return (
-                            <label
+                        {filteredProducts.length > 0 ? (
+                          filteredProducts.map((prod) => (
+                            <div
                               key={prod._id}
+                              onClick={() => {
+                                toggleProductInCategory(catIdx, prod._id);
+                                setProductSearch('');
+                              }}
                               style={{
                                 display: 'flex',
                                 alignItems: 'center',
-                                gap: 8,
-                                padding: '8px 10px',
+                                gap: 10,
+                                padding: '10px 12px',
                                 borderRadius: 8,
                                 cursor: 'pointer',
+                                transition: 'background 0.2s',
                               }}
+                              className="hover-bg-slate-50"
                             >
-                              <input
-                                type="checkbox"
-                                checked={isSelected}
-                                onChange={() => toggleProductInCategory(catIdx, prod._id)}
-                              />
-                              <span style={{ color: '#334155', fontSize: 13 }}>{prod.name}</span>
-                            </label>
-                          );
-                        })}
-                        {allProducts.length === 0 && <p className="text-muted" style={{ fontSize: 12, margin: 8 }}>No published products available</p>}
+                              {prod.logo ? (
+                                <img src={prod.logo} alt="" style={{ width: 24, height: 24, borderRadius: 4, objectFit: 'contain' }} />
+                              ) : (
+                                <div style={{ width: 24, height: 24, borderRadius: 4, background: '#e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700 }}>{prod.name[0]}</div>
+                              )}
+                              <span style={{ color: '#334155', fontSize: 14, fontWeight: 500 }}>{prod.name}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div style={{ padding: '12px', textAlign: 'center', color: '#64748b', fontSize: 13 }}>
+                            No products found matching "{productSearch}"
+                          </div>
+                        )}
                       </div>
                     )}
-                  </>
+
+                    {/* Selected Products Chips */}
+                    <div className="flex gap-sm flex-wrap mt-sm">
+                      {selectedProducts.map(p => (
+                        <span key={p._id} className="tag" style={{ background: '#f1f5f9', border: '1px solid #e2e8f0', color: '#475569', padding: '4px 10px', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+                          {p.logo && <img src={p.logo} alt="" style={{ width: 14, height: 14, objectFit: 'contain' }} />}
+                          {p.name}
+                          <span 
+                            className="tag-remove" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleProductInCategory(catIdx, p._id);
+                            }}
+                            style={{ marginLeft: 4, cursor: 'pointer' }}
+                          >
+                            <X size={12} />
+                          </span>
+                        </span>
+                      ))}
+                      {selectedProducts.length === 0 && !productSearch && (
+                        <div style={{ fontSize: 12, color: '#94a3b8', fontStyle: 'italic', padding: '4px 0' }}>
+                          No products selected. Search above to add.
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 );
               })()}
             </div>

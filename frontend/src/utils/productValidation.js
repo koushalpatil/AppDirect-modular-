@@ -339,13 +339,8 @@ export function validateProductForm(form) {
     });
   });
 
-  // Contact Us form selection / data consistency
-  if (typeof form.useCustomContactForm !== 'boolean') {
-    errors.push('Contact Us form selection is required.');
-  }
-  if (form.useCustomContactForm && (!Array.isArray(form.contactFields) || form.contactFields.length === 0)) {
-    errors.push('At least 1 custom contact form field is required when custom contact form is enabled.');
-  }
+  // Contact Us form selection (optional in current UI)
+  // We don't block publishing if no template is selected, as per current UI design.
 
   return errors;
 }

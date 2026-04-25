@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productAPI, catalogAPI, uploadAPI, configAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Check, Plus, Trash2, Upload, Image, AlertCircle, ChevronDown, ChevronUp, MousePointer2 } from 'lucide-react';
+import { Check, Plus, Trash2, Upload, Image, AlertCircle, ChevronDown, ChevronUp, Eye, X } from 'lucide-react';
 import './Admin.css';
 import {
   validateLogoFile,
@@ -40,59 +40,8 @@ function FieldError({ msg }) {
   );
 }
 
-function HelpTip({ text }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span
-      style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, position: 'relative' }}
-      onMouseEnter={() => setOpen(true)}
-      onMouseLeave={() => setOpen(false)}
-      onFocus={() => setOpen(true)}
-      onBlur={() => setOpen(false)}
-      tabIndex={0}
-      role="button"
-      aria-label={text}
-    >
-      <span
-        style={{
-          width: 16,
-          height: 16,
-          borderRadius: '50%',
-          background: '#fb923c',
-          color: '#fff',
-          display: 'inline-flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          cursor: 'pointer',
-          userSelect: 'none'
-        }}
-      >
-        <MousePointer2 size={10} />
-      </span>
-      {open && (
-        <span
-          style={{
-            position: 'absolute',
-            top: -8,
-            left: 22,
-            transform: 'translateY(-100%)',
-            background: '#111827',
-            color: '#fff',
-            fontSize: 12,
-            lineHeight: 1.35,
-            padding: '8px 10px',
-            borderRadius: 6,
-            width: 220,
-            zIndex: 30,
-            boxShadow: '0 8px 20px rgba(0,0,0,0.25)'
-          }}
-        >
-          {text}
-        </span>
-      )}
-    </span>
-  );
-}
+// Tooltip hints are now shown via CSS data-tooltip on form-label elements.
+// Use: <label className="form-label" data-tooltip="Your tooltip text here">
 
 function MultiSelectDropdownField({ label, options, values = [], onChange, placeholder = 'Select one or more' }) {
   const [open, setOpen] = useState(false);
@@ -196,16 +145,28 @@ export default function ProductCreate() {
     customTabs: [],
     attributes: [],
     resources: [],
-    useCustomContactForm: false,
-    contactFields: [],
+    contactFormTemplate: null,
   });
+
+  const [previewTmplId, setPreviewTmplId] = useState(null);
+  const [previewFields, setPreviewFields] = useState([]);
 
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingScreenshots, setUploadingScreenshots] = useState({});
   const [collapsedTabs, setCollapsedTabs] = useState({});
   const [collapsedFeatures, setCollapsedFeatures] = useState({});
+  const [contactTemplates, setContactTemplates] = useState([]);
 
   useEffect(() => { loadAttributes(); }, []);
+
+  // Load templates when reaching step 3 (contact form step)
+  useEffect(() => {
+    if (step === 3 && contactTemplates.length === 0) {
+      configAPI.getContactTemplates()
+        .then(res => setContactTemplates(res.data.templates || []))
+        .catch(() => {});
+    }
+  }, [step]);
 
   const loadAttributes = async () => {
     try {
@@ -515,8 +476,8 @@ export default function ProductCreate() {
   };
 
   // ── Step validation ─────────────────────────────────────────────────────────
-  const validateStep = () => {
-    if (step === 0) {
+  const validateStep = (s = step) => {
+    if (s === 0) {
       const name = form.name.trim();
       if (!name) { toast.error('Product name is required'); return false; }
       if (name.length < LIMITS.name.min) { toast.error(`Name must be at least ${LIMITS.name.min} characters`); return false; }
@@ -531,16 +492,24 @@ export default function ProductCreate() {
       if (developerName.length > LIMITS.developerName.max) { toast.error(`Developer name must be under ${LIMITS.developerName.max} characters`); return false; }
       if (!form.logo) { toast.error('Product logo is required'); return false; }
     }
-    if (step === 1) {
+    if (s === 1) {
       for (let i = 0; i < form.overview.length; i++) {
         const item = form.overview[i];
-        if (!(item.title || '').trim()) { toast.error(`Overview #${i + 1} title is required`); return false; }
-        if (!(item.description || '').trim()) { toast.error(`Overview #${i + 1} description is required`); return false; }
+        const t = (item.title || '').trim();
+        const d = (item.description || '').trim();
+        if (!t) { toast.error(`Overview #${i + 1} title is required`); return false; }
+        if (!d) { toast.error(`Overview #${i + 1} description is required`); return false; }
+        if (t.length < LIMITS.overviewTitle.min) { toast.error(`Overview #${i + 1} title must be at least ${LIMITS.overviewTitle.min} characters`); return false; }
+        if (d.length < LIMITS.overviewDescription.min) { toast.error(`Overview #${i + 1} description must be at least ${LIMITS.overviewDescription.min} characters`); return false; }
       }
       for (let i = 0; i < form.features.length; i++) {
         const item = form.features[i];
-        if (!(item.title || '').trim()) { toast.error(`Feature #${i + 1} title is required`); return false; }
-        if (!(item.description || '').trim()) { toast.error(`Feature #${i + 1} description is required`); return false; }
+        const t = (item.title || '').trim();
+        const d = (item.description || '').trim();
+        if (!t) { toast.error(`Feature #${i + 1} title is required`); return false; }
+        if (!d) { toast.error(`Feature #${i + 1} description is required`); return false; }
+        if (t.length < LIMITS.featureTitle.min) { toast.error(`Feature #${i + 1} title must be at least ${LIMITS.featureTitle.min} characters`); return false; }
+        if (d.length < LIMITS.featureDescription.min) { toast.error(`Feature #${i + 1} description must be at least ${LIMITS.featureDescription.min} characters`); return false; }
       }
       // Validate custom tabs
       for (let i = 0; i < form.customTabs.length; i++) {
@@ -550,8 +519,22 @@ export default function ProductCreate() {
         if (tn.length < LIMITS.customTabName.min) { toast.error(`Custom tab #${i + 1} name must be at least ${LIMITS.customTabName.min} characters`); return false; }
         for (let j = 0; j < (tab.elements || []).length; j++) {
           const el = tab.elements[j];
-          if (!(el.title || '').trim()) { toast.error(`Custom tab #${i + 1} element #${j + 1} title is required`); return false; }
-          if (!(el.description || '').trim()) { toast.error(`Custom tab #${i + 1} element #${j + 1} description is required`); return false; }
+          const et = (el.title || '').trim();
+          const ed = (el.description || '').trim();
+          if (!et) { toast.error(`Custom tab #${i + 1} element #${j + 1} title is required`); return false; }
+          if (!ed) { toast.error(`Custom tab #${i + 1} element #${j + 1} description is required`); return false; }
+          if (et.length < LIMITS.customTabElementTitle.min) { toast.error(`Custom tab #${i + 1} element #${j + 1} title must be at least ${LIMITS.customTabElementTitle.min} characters`); return false; }
+          if (ed.length < LIMITS.customTabElementDescription.min) { toast.error(`Custom tab #${i + 1} element #${j + 1} description must be at least ${LIMITS.customTabElementDescription.min} characters`); return false; }
+        }
+      }
+    }
+    if (s === 2) {
+      const requiredAttrs = attributes.filter(a => a.requiredInProductEditor);
+      for (const attr of requiredAttrs) {
+        const formAttr = form.attributes.find(a => String(a.attributeId) === String(attr._id));
+        if (!formAttr || formAttr.values.length === 0) {
+          toast.error(`"${attr.name}" attribute is required`);
+          return false;
         }
       }
     }
@@ -622,6 +605,17 @@ export default function ProductCreate() {
     }
   };
 
+  const handlePreviewTemplate = async (id) => {
+    if (!id) return;
+    try {
+      const res = await configAPI.getContactTemplate(id);
+      setPreviewFields(res.data.template.fields || []);
+      setPreviewTmplId(id);
+    } catch {
+      toast.error('Failed to load template for preview');
+    }
+  };
+
   // ── Shared repeater section renderer ───────────────────────────────────────
   const renderRepeaterSection = (field, label) => (
     <div className="wizard-section">
@@ -642,7 +636,7 @@ export default function ProductCreate() {
                     {collapsedFeatures[idx] ? <ChevronDown size={16} /> : <ChevronUp size={16} />}
                   </button>
                   <span style={{ fontWeight: 600, fontSize: 14 }}>
-                    Feature {idx + 1}{item.title ? `: ${item.title}` : ''}
+                    Feature {idx + 1}
                   </span>
                 </div>
                 {form[field].length > 1 && (
@@ -816,7 +810,7 @@ export default function ProductCreate() {
           <h1>Create Product</h1>
           <p>Add a new product to the marketplace</p>
         </div>
-        <button className="btn btn-secondary" onClick={() => navigate(-1)}>
+        <button className="btn btn-secondary" onClick={() => navigate('/admin/products')}>
           ← Back
         </button>
       </div>
@@ -884,9 +878,8 @@ export default function ProductCreate() {
 
             {/* Product Name */}
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label" data-tooltip="Enter the public product name shown in the marketplace and product detail pages.">
                 Product Name <span className="required">*</span>
-                <HelpTip text="Enter the public product name shown in the marketplace and product detail pages." />
                 <CharCount value={form.name} max={LIMITS.name.max} />
               </label>
               <input
@@ -907,9 +900,8 @@ export default function ProductCreate() {
 
             {/* Tagline */}
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label" data-tooltip="Write a short one-line description that appears under the product name.">
                 Tagline <span className="required">*</span>
-                <HelpTip text="Write a short one-line description that appears under the product name." />
                 <CharCount value={form.tagline} max={LIMITS.tagline.max} />
               </label>
               <input
@@ -929,11 +921,11 @@ export default function ProductCreate() {
 
             {/* Product Logo */}
             <div className="form-group">
-              <label className="form-label">Product Logo <span className="required">*</span><HelpTip text="Upload the main brand logo used in cards, lists, and product header." /></label>
+              <label className="form-label" data-tooltip="Upload the main brand logo used in cards, lists, and product header.">Product Logo <span className="required">*</span></label>
               <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>
                 Accepted: JPEG, PNG, WebP, SVG · Max size: {LOGO_MAX_SIZE_MB}MB · Min 50×50px · Max 4096×4096px
               </div>
-              <div className="image-upload-area" style={{ padding: '12px' }}>
+              <div className="image-upload-area" style={{ padding: '10px', maxWidth: 260 }}>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/svg+xml"
@@ -941,26 +933,26 @@ export default function ProductCreate() {
                   disabled={uploadingLogo}
                 />
                 {uploadingLogo ? (
-                  <div style={{ padding: '20px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    <div className="spinner mb-sm" style={{ margin: '0 auto 8px' }} />
-                    <p>Uploading & validating…</p>
+                  <div style={{ padding: '12px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    <div className="spinner mb-sm" style={{ margin: '0 auto 6px', width: 20, height: 20, borderWidth: 2 }} />
+                    <p style={{ fontSize: 12, margin: 0 }}>Uploading…</p>
                   </div>
                 ) : form.logo ? (
-                  <div style={{ padding: '12px', textAlign: 'center' }}>
+                  <div style={{ padding: '8px', textAlign: 'center' }}>
                     <img
                       src={form.logo}
                       alt="Logo preview"
                       className="image-preview"
-                      style={{ maxHeight: 100, maxWidth: 200, objectFit: 'contain', borderRadius: 8 }}
+                      style={{ maxHeight: 64, maxWidth: 160, objectFit: 'contain', borderRadius: 6, margin: 0 }}
                     />
-                    <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
+                    <div style={{ marginTop: 6, fontSize: 11, color: '#6b7280' }}>
                       Click to replace
                     </div>
                   </div>
                 ) : (
-                  <div style={{ padding: '20px', color: 'var(--text-muted)', textAlign: 'center' }}>
-                    <Upload size={24} style={{ marginBottom: 8 }} />
-                    <p>Click or drag to upload logo</p>
+                  <div style={{ padding: '14px', color: 'var(--text-muted)', textAlign: 'center' }}>
+                    <Upload size={20} style={{ marginBottom: 6 }} />
+                    <p style={{ fontSize: 12, margin: 0 }}>Click or drag to upload logo</p>
                   </div>
                 )}
               </div>
@@ -969,9 +961,8 @@ export default function ProductCreate() {
 
             {/* Developer Name */}
             <div className="form-group">
-              <label className="form-label">
+              <label className="form-label" data-tooltip="Name of the company or developer that owns the product.">
                 Developer Name <span className="required">*</span>
-                <HelpTip text="Name of the company or developer that owns the product." />
                 <CharCount value={form.developerName} max={LIMITS.developerName.max} />
               </label>
               <input
@@ -1004,7 +995,7 @@ export default function ProductCreate() {
 
           {/* Resources (hardcoded) */}
           <div className="wizard-section">
-              <h3 className="wizard-section-title">Resources <HelpTip text="Attach downloadable documents such as brochures, datasheets, or specs." /></h3>
+              <h3 className="wizard-section-title" data-tooltip="Attach downloadable documents such as brochures, datasheets, or specs.">Resources</h3>
             <p className="text-muted" style={{ fontSize: 12, marginBottom: 16 }}>
               Upload PDF, Word, Excel, CSV or TXT documentation · Max {RESOURCE_MAX_SIZE_MB}MB per file
             </p>
@@ -1043,7 +1034,23 @@ export default function ProductCreate() {
 
             <div style={{ marginTop: '16px' }}>
               {uploadingScreenshots['resource-upload'] ? (
-                <div className="spinner mb-sm" />
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div className="spinner" style={{ width: 20, height: 20, borderWidth: 2 }} />
+                  <span style={{ fontSize: 13, color: '#64748b' }}>Uploading...</span>
+                  <button 
+                    type="button" 
+                    className="btn btn-sm btn-ghost" 
+                    style={{ color: '#ef4444', fontSize: 12 }}
+                    onClick={() => {
+                      // We don't have a built-in "abort" in uploadAPI yet, 
+                      // but we can clear the loading state to "cancel" the UI.
+                      setUploadingScreenshots(prev => ({ ...prev, 'resource-upload': false }));
+                      toast.success('Upload cancelled');
+                    }}
+                  >
+                    Cancel
+                  </button>
+                </div>
               ) : (
                 <label
                   className="btn btn-secondary"
@@ -1064,7 +1071,7 @@ export default function ProductCreate() {
           {/* Custom Tabs */}
           <div className="wizard-section">
             <h3 className="wizard-section-title">
-              Custom Tabs <HelpTip text="Create additional content tabs with text and image slides." />
+              Custom Tabs
               <span style={{ fontSize: 12, fontWeight: 400, color: '#9ca3af', marginLeft: 8 }}>
                 {form.customTabs.length}/{LIMITS.maxCustomTabs} tabs
               </span>
@@ -1106,7 +1113,7 @@ export default function ProductCreate() {
                     {/* Tab Name */}
                     <div className="form-group">
                       <label className="form-label">
-                        Tab Name <span className="required">*</span><HelpTip text="This name appears as the tab title on the product detail page." />
+                        Tab Name <span className="required">*</span>
                         <CharCount value={tab.tabName} max={LIMITS.customTabName.max} />
                       </label>
                       <input
@@ -1135,7 +1142,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Title <span className="required">*</span><HelpTip text="The title for this content block inside the tab." />
+                            Title <span className="required">*</span>
                             <CharCount value={el.title} max={LIMITS.customTabElementTitle.max} />
                           </label>
                           <input
@@ -1150,7 +1157,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Description <span className="required">*</span><HelpTip text="Add a concise description for this block. It supports longer text." />
+                            Description <span className="required">*</span>
                             <CharCount value={el.description} max={LIMITS.customTabElementDescription.max} warn={0.9} />
                           </label>
                           <textarea
@@ -1164,7 +1171,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Images <HelpTip text="Upload screenshots or visuals for this tab block. Multiple images are allowed." />
+                            Images
                             <span style={{ fontSize: 11, color: '#9ca3af', float: 'right' }}>
                               {el.screenshots.length}/{SCREENSHOT_MAX_PER_SECTION} · Max 5MB each · JPEG/PNG/WebP/GIF
                             </span>
@@ -1226,7 +1233,7 @@ export default function ProductCreate() {
       {step === 2 && (
         <div className="wizard-content card card-body">
           <div className="wizard-section">
-            <h3 className="wizard-section-title">Attributes <HelpTip text="Choose the catalog attributes that should be available for this product." /></h3>
+            <h3 className="wizard-section-title" data-tooltip="Choose the catalog attributes that should be available for this product.">Attributes</h3>
             {attributes.length === 0 ? (
               <p className="text-muted" style={{ fontSize: '14px' }}>
                 No attributes configured. Go to Attribute Management to add attributes.
@@ -1276,92 +1283,126 @@ export default function ProductCreate() {
       {step === 3 && (
         <div className="wizard-content card card-body">
           <div className="wizard-section">
-            <h3 className="wizard-section-title">Contact Us Form <HelpTip text="Enable a custom contact form for this product, or use the default marketplace form." /></h3>
+            <h3 className="wizard-section-title">Contact Us Form</h3>
             <p className="text-muted" style={{ fontSize: 13, marginBottom: 24, paddingLeft: 4 }}>
-              Decide whether to use the default marketplace contact form or create a custom one for this product.
+              Select a contact form template for this product. These templates are managed in 
+              <button 
+                type="button" 
+                className="btn-link" 
+                style={{ fontSize: 13, fontWeight: 600, color: 'var(--primary)', border: 'none', background: 'none', padding: '0 4px', cursor: 'pointer' }}
+                onClick={() => navigate('/admin/config/contact')}
+              >
+                Contact Form Configuration
+              </button>.
             </p>
 
-            <div className="repeater-item no-padding" style={{ marginBottom: 32, backgroundColor: '#f8fafc' }}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <span style={{ fontWeight: 600, fontSize: 15, color: '#1e293b' }}>Custom Contact Form</span>
-                  <p className="text-muted" style={{ fontSize: 12, marginTop: 4 }}>
-                    {form.useCustomContactForm 
-                      ? "Custom form is enabled. You can add, edit, or remove fields below."
-                      : "Default admin configuration is being used for this product."}
-                  </p>
-                </div>
-                <label className="toggle">
-                  <input
-                    type="checkbox"
-                    checked={form.useCustomContactForm}
-                    onChange={async (e) => {
-                      const checked = e.target.checked;
-                      
-                      if (!checked) {
-                        // Turning OFF — just update the toggle, keep fields intact for potential re-enable
-                        update('useCustomContactForm', false);
-                        return;
-                      }
-
-                      // Turning ON — fetch global defaults if no custom fields yet
-                      if (form.contactFields.length === 0) {
-                        try {
-                          const res = await configAPI.getContact();
-                          const globalFields = (res.data.config?.contactFields || []).map((f) => {
-                            // Deep-clone and strip MongoDB metadata to prevent duplication
-                            const { _id, __v, _doc, ...clean } = f._doc || f;
-                            return {
-                              ...clean,
-                              isDefault: true,
-                              options: (clean.options || []).map(({ _id: _oid, ...opt }) => opt),
-                              validations: clean.validations
-                                ? (({ _id: _vid, ...rest }) => rest)(clean.validations)
-                                : {},
-                            };
-                          });
-                          // Batch both updates into a single setForm call
-                          setForm((prev) => ({
-                            ...prev,
-                            useCustomContactForm: true,
-                            contactFields: globalFields,
-                          }));
-                          setFieldErrors((prev) => ({ ...prev, useCustomContactForm: null, contactFields: null }));
-                          return;
-                        } catch (err) {
-                          console.error("Failed to fetch global contact fields", err);
-                          toast.error("Failed to load default fields. You can still add them manually.");
-                        }
-                      }
-                      update('useCustomContactForm', true);
-                    }}
-                  />
-                  <span className="toggle-slider" />
-                </label>
+            <div className="form-group">
+              <label className="form-label">Assign Template</label>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <select
+                  className="form-select"
+                  style={{ flex: 1 }}
+                  value={form.contactFormTemplate || ''}
+                  onChange={(e) => update('contactFormTemplate', e.target.value || null)}
+                >
+                  <option value="">No contact form</option>
+                  {contactTemplates.map(t => (
+                    <option key={t._id} value={t._id}>{t.name} ({t.fields?.length || 0} fields)</option>
+                  ))}
+                </select>
+                <button 
+                  type="button"
+                  className="btn btn-secondary" 
+                  disabled={!form.contactFormTemplate}
+                  onClick={() => handlePreviewTemplate(form.contactFormTemplate)}
+                >
+                  <Eye size={16} /> Preview Fields
+                </button>
+              </div>
+              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 8 }}>
+                {form.contactFormTemplate 
+                  ? "This template's fields will be shown to users when they click 'Contact Us' on this product's page."
+                  : "No contact form will be available for this product if no template is selected."}
               </div>
             </div>
 
-            {form.useCustomContactForm && (
-              <div className="fade-in">
-                <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 24 }}>
-                  <h4 style={{ fontSize: 14, fontWeight: 700, marginBottom: 16 }}>Form Fields</h4>
-                  <ContactFieldEditor
-                    fields={form.contactFields}
-                    setFields={(val) => {
-                      const next = typeof val === 'function' ? val(form.contactFields) : val;
-                      update('contactFields', next);
-                    }}
-                  />
+            {!form.contactFormTemplate && (
+              <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f8fafc', borderRadius: 8, color: '#64748b', border: '1px dashed #e2e8f0', marginTop: 16 }}>
+                <p style={{ fontSize: 14 }}>No template selected.</p>
+                <small>Select a template from the dropdown above to enable the contact form.</small>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Template Preview Modal ────────────────────────────────────────── */}
+      {previewTmplId && (
+        <div className="modal-overlay" onClick={() => setPreviewTmplId(null)}>
+          <div className="modal" style={{ maxWidth: 540 }} onClick={e => e.stopPropagation()}>
+            <div className="modal-header">
+              <h3 className="modal-title">Template Preview</h3>
+              <button className="btn btn-icon btn-ghost" onClick={() => setPreviewTmplId(null)}>
+                <X size={18} />
+              </button>
+            </div>
+            <div className="modal-body" style={{ maxHeight: '65vh', overflowY: 'auto' }}>
+              {(!previewFields || previewFields.length === 0) ? (
+                <p className="text-muted" style={{ textAlign: 'center', padding: '30px 0' }}>
+                  No fields configured in this template.
+                </p>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {previewFields.sort((a, b) => (a.order ?? 0) - (b.order ?? 0)).map((field, i) => (
+                    <div key={field.fieldName || i} className="form-group" style={{ marginBottom: 0 }}>
+                      <label className="form-label">
+                        {field.label}
+                        {field.required && <span className="required">*</span>}
+                      </label>
+                      {field.helpText && (
+                        <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 4 }}>{field.helpText}</div>
+                      )}
+                      {field.type === 'textarea' ? (
+                        <textarea className="form-textarea" placeholder={field.placeholder} disabled rows={3} />
+                      ) : field.type === 'select' ? (
+                        <select className="form-select" disabled>
+                          <option>{field.placeholder || `Select ${field.label}`}</option>
+                          {(field.options || []).map(opt => (
+                            <option key={opt.value} value={opt.value}>{opt.label}</option>
+                          ))}
+                        </select>
+                      ) : field.type === 'radio' ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {(field.options || []).map(opt => (
+                            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                              <input type="radio" name={field.fieldName} disabled /> {opt.label}
+                            </label>
+                          ))}
+                        </div>
+                      ) : field.type === 'checkbox' && field.options?.length > 0 ? (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                          {field.options.map(opt => (
+                            <label key={opt.value} style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13 }}>
+                              <input type="checkbox" disabled /> {opt.label}
+                            </label>
+                          ))}
+                        </div>
+                      ) : (
+                        <input
+                          type={field.type === 'email' ? 'email' : field.type === 'number' ? 'number' : field.type === 'date' ? 'date' : field.type === 'tel' ? 'tel' : 'text'}
+                          className="form-input"
+                          placeholder={field.placeholder}
+                          disabled
+                        />
+                      )}
+                    </div>
+                  ))}
                 </div>
-              </div>
-            )}
-            
-            {!form.useCustomContactForm && (
-              <div style={{ textAlign: 'center', padding: '40px 20px', background: '#f1f5f9', borderRadius: 8, color: '#64748b' }}>
-                <p style={{ fontSize: 14 }}>Using the default system contact form.</p>
-                <small>Enable the toggle above to customize fields specifically for this product.</small>
-              </div>
-            )}
+              )}
+            </div>
+            <div className="modal-footer">
+              <button className="btn btn-primary" onClick={() => setPreviewTmplId(null)}>Close Preview</button>
+            </div>
           </div>
         </div>
       )}

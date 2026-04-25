@@ -1442,3 +1442,18 @@
   .pd-similar-row .pub-product-card .pub-card-logo-wrap { height: 120px; }
 }
 
+/* ============ RESOURCE CARDS ============ */
+
+.pd-resource-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.08);
+  border-color: #d0e4ff !important;
+}
+
+.pd-resource-download-btn:hover {
+  background: #f1f5f9 !important;
+  color: #0066cc !important;
+  border-color: #cbd5e1 !important;
+}
+
+

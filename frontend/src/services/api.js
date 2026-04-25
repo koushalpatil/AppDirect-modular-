@@ -34,21 +34,24 @@ export const catalogAPI = {
   getPublic: () => api.get('/catalog/public'),
 };
 
-// Config (Admin)
 export const configAPI = {
-  getContact: () => api.get('/config/contact'),
-  updateContact: (data) => api.put('/config/contact', data),
   getHomepage: () => api.get('/config/homepage'),
   updateHomepage: (data) => api.put('/config/homepage', data),
   // Public
   getPublicHomepage: () => api.get('/config/public/homepage'),
-  getPublicContactForm: () => api.get('/config/public/contact-form'),
   submitPublicContactForm: (data) => api.post('/config/public/contact-form/submit', data),
   // Footer
   getFooter: () => api.get('/config/footer'),
   updateFooter: (data) => api.put('/config/footer', data),
   getPublicFooter: () => api.get('/config/public/footer'),
   getUserApps: () => api.get('/config/my-apps'),
+  // Contact form templates
+  getContactTemplates: () => api.get('/config/contact-templates'),
+  getContactTemplate: (id) => api.get(`/config/contact-templates/${id}`),
+  createContactTemplate: (data) => api.post('/config/contact-templates', data),
+  updateContactTemplate: (id, data) => api.put(`/config/contact-templates/${id}`, data),
+  deleteContactTemplate: (id) => api.delete(`/config/contact-templates/${id}`),
+  cloneContactTemplate: (id) => api.post(`/config/contact-templates/${id}/clone`),
 };
 
 // Upload

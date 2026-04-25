@@ -500,64 +500,31 @@ exports.searchProducts = async (req, res) => {
     let total = 0;
 
     if (hasSearch) {
-      const dataPipeline = [];
-
-      if (sort === 'alphabetical') {
-        dataPipeline.push({ $addFields: { sortNameLower: { $toLower: '$name' } } });
-        dataPipeline.push({ $sort: { sortNameLower: 1, _id: 1 } });
-      } else if (sort === 'newest') {
-        dataPipeline.push({ $sort: { createdAt: -1 } });
-      } else {
-        dataPipeline.push({ $sort: { searchScore: -1, createdAt: -1 } });
-      }
-
-      dataPipeline.push(
-        { $skip: skip },
-        { $limit: limitNum },
-        {
-          $project: {
-            name: 1,
-            tagline: 1,
-            logo: 1,
-            developerName: 1,
-            attributes: 1,
-            createdAt: 1,
-            updatedAt: 1,
-          },
-        }
-      );
-
-      const pipeline = [
-        {
-          $search: {
-            index: 'default',
-            compound: {
-              must: [
-                {
-                  text: {
-                    query: search.trim(),
-                    path: ['name', 'tagline'],
-                    fuzzy: { maxEdits: 1, prefixLength: 2 },
-                  },
-                },
-              ],
-            },
-          },
-        },
-        { $match: filter },
-        { $addFields: { searchScore: { $meta: 'searchScore' } } },
-        {
-          $facet: {
-            metadata: [{ $count: 'total' }],
-            data: dataPipeline,
-          },
-        },
+      // Pure regex-based search — works on all MongoDB deployments
+      const escaped = search.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      filter.$or = [
+        { name: { $regex: escaped, $options: 'i' } },
+        { tagline: { $regex: escaped, $options: 'i' } },
+        { developerName: { $regex: escaped, $options: 'i' } },
       ];
 
-      const result = await Product.aggregate(pipeline);
-      const payload = result[0] || { metadata: [], data: [] };
-      total = payload.metadata?.[0]?.total || 0;
-      products = payload.data || [];
+      let sortQuery = { updatedAt: -1 };
+      if (sort === 'newest') sortQuery = { createdAt: -1 };
+      if (sort === 'alphabetical') sortQuery = { name: 1 };
+
+      total = await Product.countDocuments(filter);
+      const query = Product.find(filter)
+        .select('name tagline logo developerName attributes createdAt updatedAt')
+        .populate('attributes.attributeId', 'name displayOnHomepage showForFiltering')
+        .sort(sortQuery)
+        .skip(skip)
+        .limit(limitNum);
+
+      if (sort === 'alphabetical') {
+        query.collation({ locale: 'en', strength: 2 });
+      }
+
+      products = await query;
     } else {
       let sortQuery = { updatedAt: -1 };
       if (sort === 'newest') sortQuery = { createdAt: -1 };

@@ -354,7 +354,7 @@ export default function CatalogManagement() {
               </div>
 
               {showAdvanced && (
-                <>
+                <div style={{ marginTop: 16 }}>
                   <div className="toggle-wrapper">
                     <span className="toggle-label">Display in Additional Information</span>
                     <label className="toggle"><input type="checkbox" checked={form.displayOnHomepage} onChange={(e) => setForm(prev => ({ ...prev, displayOnHomepage: e.target.checked }))} /><span className="toggle-slider" /></label>
@@ -367,7 +367,7 @@ export default function CatalogManagement() {
                     <span className="toggle-label">Allow for filtering</span>
                     <label className="toggle"><input type="checkbox" checked={form.showForFiltering} onChange={(e) => setForm(prev => ({ ...prev, showForFiltering: e.target.checked }))} /><span className="toggle-slider" /></label>
                   </div>
-                </>
+                </div>
               )}
             </div>
             <div className="modal-footer">

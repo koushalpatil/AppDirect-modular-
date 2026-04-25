@@ -1,6 +1,7 @@
 const ContentConfig = require('../models/ContentConfig');
 const Product = require('../models/Product');
 const ContactSubmission = require('../models/ContactSubmission');
+const ContactFormTemplate = require('../models/ContactFormTemplate');
 
 const DEFAULT_CONTACT_FIELDS = [
   {
@@ -297,64 +298,7 @@ const validateSubmissionValue = (field, rawValue) => {
   return { value: textVal };
 };
 
-const getOrCreateContactConfig = async () => {
-  let config = await ContentConfig.findOne({ type: 'contact_form' });
-  if (!config) {
-    config = await ContentConfig.create({
-      type: 'contact_form',
-      contactFields: DEFAULT_CONTACT_FIELDS,
-    });
-  }
-  return config;
-};
-
-// Get or initialize contact form config
-exports.getContactConfig = async (req, res) => {
-  try {
-    const config = await getOrCreateContactConfig();
-    const normalized = validateFieldConfigs(config.contactFields || []).normalized;
-    res.json({ config: { ...config.toObject(), contactFields: normalized } });
-  } catch (error) {
-    console.error('Get contact config error:', error);
-    res.status(500).json({ message: 'Failed to retrieve contact form configuration.' });
-  }
-};
-
-// Update contact form config
-exports.updateContactConfig = async (req, res) => {
-  try {
-    const { contactFields } = req.body;
-
-    if (!contactFields || !Array.isArray(contactFields)) {
-      return res.status(400).json({ message: 'contactFields array is required.' });
-    }
-
-    const { normalized, errors } = validateFieldConfigs(contactFields);
-    if (errors.length > 0) {
-      return res.status(400).json({
-        message: 'Invalid field configuration.',
-        errors,
-      });
-    }
-
-    let config = await ContentConfig.findOne({ type: 'contact_form' });
-    if (!config) {
-      config = new ContentConfig({ type: 'contact_form' });
-    }
-
-    config.contactFields = normalized;
-    config.updatedBy = req.user._id;
-    await config.save();
-
-    res.json({
-      message: 'Contact form configuration updated.',
-      config: { ...config.toObject(), contactFields: normalized },
-    });
-  } catch (error) {
-    console.error('Update contact config error:', error);
-    res.status(500).json({ message: 'Failed to update contact form configuration.' });
-  }
-};
+// (Global contact config removed — templates are used exclusively)
 
 // Get or initialize homepage config
 exports.getHomepageConfig = async (req, res) => {
@@ -426,50 +370,32 @@ exports.getPublicHomepage = async (req, res) => {
   }
 };
 
-// Public: Get contact form fields (global default)
-exports.getPublicContactForm = async (req, res) => {
-  try {
-    const config = await getOrCreateContactConfig();
-    const fields = validateFieldConfigs(config.contactFields || []).normalized
-      .filter((field) => field.type !== 'file');
-    res.json({ fields });
-  } catch (error) {
-    console.error('Get public contact form error:', error);
-    res.status(500).json({ message: 'Failed to retrieve contact form.' });
-  }
-};
-
-// Public: Get contact form fields for a specific product (checks toggle)
+// Public: Get contact form fields for a specific product (resolves template ref)
 exports.getPublicProductContactForm = async (req, res) => {
   try {
     const product = await Product.findOne({
       _id: req.params.id,
       status: 'published',
-    }).select('useCustomContactForm contactFields');
+    }).select('contactFormTemplate').populate('contactFormTemplate');
 
     if (!product) {
       return res.status(404).json({ message: 'Product not found.' });
     }
 
-    // If product uses custom form AND has fields configured, use those
-    if (product.useCustomContactForm && product.contactFields && product.contactFields.length > 0) {
-      const fields = validateFieldConfigs(product.contactFields).normalized
-        .filter((field) => field.type !== 'file');
-      return res.json({ fields, isCustom: true });
+    if (!product.contactFormTemplate || !product.contactFormTemplate.fields || product.contactFormTemplate.fields.length === 0) {
+      return res.json({ fields: [], hasTemplate: false });
     }
 
-    // Otherwise fall back to global config
-    const config = await getOrCreateContactConfig();
-    const fields = validateFieldConfigs(config.contactFields || []).normalized
+    const fields = validateFieldConfigs(product.contactFormTemplate.fields).normalized
       .filter((field) => field.type !== 'file');
-    res.json({ fields, isCustom: false });
+    return res.json({ fields, hasTemplate: true, templateName: product.contactFormTemplate.name });
   } catch (error) {
     console.error('Get public product contact form error:', error);
     res.status(500).json({ message: 'Failed to retrieve contact form.' });
   }
 };
 
-// Public: Submit contact form based on dynamic config
+// Public: Submit contact form based on product's template
 exports.submitPublicContactForm = async (req, res) => {
   try {
     const { productId, values } = req.body;
@@ -481,20 +407,18 @@ exports.submitPublicContactForm = async (req, res) => {
       return res.status(400).json({ message: 'values object is required.' });
     }
 
-    const product = await Product.findById(productId).select('_id status useCustomContactForm contactFields');
+    const product = await Product.findById(productId)
+      .select('_id status contactFormTemplate')
+      .populate('contactFormTemplate');
     if (!product || product.status !== 'published') {
       return res.status(400).json({ message: 'Invalid product.' });
     }
 
-    // Use product's own fields if toggle is ON and fields exist, otherwise global
-    let rawFields;
-    if (product.useCustomContactForm && product.contactFields && product.contactFields.length > 0) {
-      rawFields = product.contactFields;
-    } else {
-      const config = await getOrCreateContactConfig();
-      rawFields = config.contactFields || [];
+    if (!product.contactFormTemplate || !product.contactFormTemplate.fields || product.contactFormTemplate.fields.length === 0) {
+      return res.status(400).json({ message: 'No contact form template configured for this product.' });
     }
-    const fields = validateFieldConfigs(rawFields).normalized
+
+    const fields = validateFieldConfigs(product.contactFormTemplate.fields).normalized
       .filter((field) => field.type !== 'file');
 
     const cleanData = {};
@@ -708,5 +632,139 @@ exports.getPublicFooter = async (req, res) => {
   } catch (error) {
     console.error('Get public footer error:', error);
     res.status(500).json({ message: 'Failed to retrieve footer data.' });
+  }
+};
+
+// ─── Contact Form Templates ──────────────────────────────────────────────────
+
+// List all templates
+exports.getContactTemplates = async (req, res) => {
+  try {
+    const templates = await ContactFormTemplate.find()
+      .sort({ updatedAt: -1 })
+      .populate('createdBy', 'firstName lastName')
+      .populate('updatedBy', 'firstName lastName');
+    res.json({ templates });
+  } catch (error) {
+    console.error('Get contact templates error:', error);
+    res.status(500).json({ message: 'Failed to retrieve templates.' });
+  }
+};
+
+// Get single template
+exports.getContactTemplate = async (req, res) => {
+  try {
+    const template = await ContactFormTemplate.findById(req.params.id);
+    if (!template) return res.status(404).json({ message: 'Template not found.' });
+    res.json({ template });
+  } catch (error) {
+    console.error('Get contact template error:', error);
+    res.status(500).json({ message: 'Failed to retrieve template.' });
+  }
+};
+
+// Create template
+exports.createContactTemplate = async (req, res) => {
+  try {
+    const { name, description, fields } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ message: 'Template name is required.' });
+    }
+
+    const { normalized, errors } = validateFieldConfigs(fields || []);
+    if (errors.length > 0) {
+      return res.status(400).json({ message: 'Invalid field configuration.', errors });
+    }
+
+    const template = await ContactFormTemplate.create({
+      name: name.trim(),
+      description: (description || '').trim(),
+      fields: normalized,
+      createdBy: req.user._id,
+      updatedBy: req.user._id,
+    });
+
+    res.status(201).json({ message: 'Template created.', template });
+  } catch (error) {
+    console.error('Create contact template error:', error);
+    res.status(500).json({ message: 'Failed to create template.' });
+  }
+};
+
+// Update template
+exports.updateContactTemplate = async (req, res) => {
+  try {
+    const template = await ContactFormTemplate.findById(req.params.id);
+    if (!template) return res.status(404).json({ message: 'Template not found.' });
+
+    const { name, description, fields } = req.body;
+
+    if (name !== undefined) {
+      if (!name.trim()) return res.status(400).json({ message: 'Template name is required.' });
+      template.name = name.trim();
+    }
+    if (description !== undefined) template.description = description.trim();
+
+    if (fields !== undefined) {
+      const { normalized, errors } = validateFieldConfigs(fields);
+      if (errors.length > 0) {
+        return res.status(400).json({ message: 'Invalid field configuration.', errors });
+      }
+      template.fields = normalized;
+    }
+
+    template.updatedBy = req.user._id;
+    await template.save();
+
+    res.json({ message: 'Template updated.', template });
+  } catch (error) {
+    console.error('Update contact template error:', error);
+    res.status(500).json({ message: 'Failed to update template.' });
+  }
+};
+
+// Delete template
+exports.deleteContactTemplate = async (req, res) => {
+  try {
+    const template = await ContactFormTemplate.findById(req.params.id);
+    if (!template) return res.status(404).json({ message: 'Template not found.' });
+
+    await template.deleteOne();
+    res.json({ message: 'Template deleted.' });
+  } catch (error) {
+    console.error('Delete contact template error:', error);
+    res.status(500).json({ message: 'Failed to delete template.' });
+  }
+};
+
+// Clone template
+exports.cloneContactTemplate = async (req, res) => {
+  try {
+    const source = await ContactFormTemplate.findById(req.params.id);
+    if (!source) return res.status(404).json({ message: 'Template not found.' });
+
+    // Deep clone fields, stripping _id to let Mongoose generate new ones
+    const clonedFields = source.fields.map(f => {
+      const { _id, ...rest } = f.toObject();
+      return {
+        ...rest,
+        options: (rest.options || []).map(({ _id: _, ...opt }) => opt),
+        validations: rest.validations ? (({ _id: _, ...v }) => v)(rest.validations) : {},
+      };
+    });
+
+    const clone = await ContactFormTemplate.create({
+      name: `${source.name} (Copy)`,
+      description: source.description,
+      fields: clonedFields,
+      createdBy: req.user._id,
+      updatedBy: req.user._id,
+    });
+
+    res.status(201).json({ message: 'Template cloned.', template: clone });
+  } catch (error) {
+    console.error('Clone contact template error:', error);
+    res.status(500).json({ message: 'Failed to clone template.' });
   }
 };

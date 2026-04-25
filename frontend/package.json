@@ -15,7 +15,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "axios": "^1.15.1",
     "country-state-city": "^3.2.1",
-    "lucide-react": "^1.8.0",
+    "lucide-react": "^1.11.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
     "react-hot-toast": "^2.6.0",

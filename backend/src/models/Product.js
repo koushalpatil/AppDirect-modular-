@@ -53,38 +53,12 @@ const productSchema = new mongoose.Schema({
     url: { type: String, required: true },
   }],
 
-  // Stage 4: Contact Form Configuration (per-product)
-  useCustomContactForm: { type: Boolean, default: false },
-  contactFields: [{
-    fieldName: { type: String, required: true },
-    label: { type: String, required: true },
-    type: {
-      type: String,
-      enum: ['text', 'textarea', 'email', 'number', 'select', 'radio', 'checkbox', 'date', 'file', 'tel'],
-      default: 'text',
-    },
-    required: { type: Boolean, default: false },
-    placeholder: { type: String },
-    defaultValue: { type: mongoose.Schema.Types.Mixed },
-    helpText: { type: String },
-    options: [{
-      label: { type: String, required: true, trim: true },
-      value: { type: String, required: true, trim: true },
-    }],
-    validations: {
-      minLength: { type: Number },
-      maxLength: { type: Number },
-      regex: { type: String },
-      min: { type: Number },
-      max: { type: Number },
-      step: { type: Number },
-      minDate: { type: String },
-      maxDate: { type: String },
-      customError: { type: String },
-    },
-    isDefault: { type: Boolean, default: false },
-    order: { type: Number, default: 0 },
-  }],
+  // Stage 4: Contact Form Template (per-product)
+  contactFormTemplate: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'ContactFormTemplate',
+    default: null,
+  },
 
   // Metadata
   status: {
