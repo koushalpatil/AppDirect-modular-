@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { configAPI } from '../../services/api';
 import {
   Plus, Trash2, Save, GripVertical, FileText,
@@ -106,6 +107,7 @@ const emptySocial = (platform = 'facebook') => ({ platform, url: '' });
 const emptyBottomLink = () => ({ title: '', url: '' });
 
 export default function FooterConfig() {
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activeTab, setActiveTab] = useState('sections');
@@ -320,6 +322,7 @@ export default function FooterConfig() {
           </p>
         </div>
         <div className="fc-save-bar">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
           {dirty && <span className="fc-unsaved-text">Unsaved changes</span>}
           <button className="btn btn-primary" onClick={handleSave} disabled={saving || !dirty}>
             <Save size={16} />

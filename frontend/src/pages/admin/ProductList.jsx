@@ -10,6 +10,7 @@ export default function ProductList() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
+  const [deleteTarget, setDeleteTarget] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => { 
@@ -45,7 +46,6 @@ export default function ProductList() {
   };
 
   const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
     try {
       await productAPI.delete(id);
       toast.success('Product deleted');
@@ -55,6 +55,13 @@ export default function ProductList() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    await handleDelete(target.id, target.name);
+  };
+
   return (
     <div className="fade-in">
       <div className="page-header">
@@ -62,9 +69,12 @@ export default function ProductList() {
           <h1>Products</h1>
           <p>Manage your marketplace products</p>
         </div>
-        <Link to="/admin/products/new" className="btn btn-primary">
-          <Plus size={16} /> New Product
-        </Link>
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
+          <Link to="/admin/products/new" className="btn btn-primary">
+            <Plus size={16} /> Create Product
+          </Link>
+        </div>
       </div>
 
       <div style={{ marginBottom: '1.5rem', maxWidth: 600 }}>
@@ -111,6 +121,7 @@ export default function ProductList() {
             <thead>
               <tr>
                 <th>Product</th>
+                <th>Developer</th>
                 <th>Status</th>
                 <th>Created At</th>
                 <th>Created By</th>
@@ -141,6 +152,14 @@ export default function ProductList() {
                         <div>
                           <div className="table-product-name">{product.name}</div>
                           {product.tagline && <div className="table-product-tagline">{product.tagline}</div>}
+                        </div>
+                      </div>
+                    </td>
+                    <td>
+                      <div className="table-user-cell">
+                        <div className="table-user-avatar">{(product.developerName || '—')[0]}</div>
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontWeight: 600, color: '#0f172a' }}>{product.developerName || '—'}</div>
                         </div>
                       </div>
                     </td>
@@ -178,7 +197,7 @@ export default function ProductList() {
                         <button className="btn btn-icon btn-ghost" onClick={() => navigate(`/admin/products/${product._id}/edit`)} title="Edit">
                           <Edit3 size={14} />
                         </button>
-                        <button className="btn btn-icon btn-ghost" onClick={() => handleDelete(product._id, product.name)} title="Delete">
+                        <button className="btn btn-icon btn-ghost" onClick={() => setDeleteTarget({ id: product._id, name: product.name })} title="Delete">
                           <Trash2 size={14} />
                         </button>
                       </div>
@@ -188,6 +207,21 @@ export default function ProductList() {
               })}
             </tbody>
           </table>
+        </div>
+      )}
+
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>Delete product?</h3>
+            <p style={{ color: '#64748b', lineHeight: 1.5, marginBottom: 20 }}>
+              This will permanently remove “{deleteTarget.name}” from the marketplace.
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>Cancel</button>
+              <button className="btn btn-primary" onClick={confirmDelete}>Delete</button>
+            </div>
+          </div>
         </div>
       )}
     </div>

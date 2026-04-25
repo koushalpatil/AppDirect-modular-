@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { configAPI, catalogAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { Save, Settings, ShieldAlert, Info, Zap, Layers, Target, HelpCircle } from 'lucide-react';
@@ -79,19 +80,22 @@ export default function SimilaritySettings() {
             Configure how product similarity is calculated and matched across the marketplace.
           </p>
         </div>
-        <button 
-          className="btn btn-primary" 
-          onClick={handleSave} 
-          disabled={saving}
-          style={{ 
-            padding: '10px 24px', 
-            borderRadius: '12px',
-            boxShadow: '0 4px 12px rgba(var(--primary-rgb), 0.25)',
-            transition: 'all 0.2s ease'
-          }}
-        >
-          <Save size={18} /> {saving ? 'Saving...' : 'Save Configuration'}
-        </button>
+        <div className="page-actions">
+          <Link to="/admin" className="btn btn-secondary">← Back</Link>
+          <button 
+            className="btn btn-primary" 
+            onClick={handleSave} 
+            disabled={saving}
+            style={{ 
+              padding: '10px 24px', 
+              borderRadius: '12px',
+              boxShadow: '0 4px 12px rgba(var(--primary-rgb), 0.25)',
+              transition: 'all 0.2s ease'
+            }}
+          >
+            <Save size={18} /> {saving ? 'Saving...' : 'Save Configuration'}
+          </button>
+        </div>
       </div>
 
       <div className="admin-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
@@ -235,7 +239,7 @@ export default function SimilaritySettings() {
                   <p style={{ fontSize: '14px', color: 'var(--text-muted)', lineHeight: '1.6', margin: 0 }}>
                     The engine calculates similarity scores by aggregating weights from all attributes that have "Use in Similarity" enabled in the 
                     <a href="/admin/catalog" style={{ color: 'var(--primary-color)', textDecoration: 'none', fontWeight: 600, marginLeft: '4px' }}>
-                      Catalog Management
+                      Attribuite Management
                     </a> section.
                   </p>
                 </div>

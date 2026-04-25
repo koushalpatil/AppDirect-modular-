@@ -313,8 +313,8 @@ export default function ProductContact() {
   if (!product) return null;
 
   return (
-    <div className="pc-page-wrapper" style={{ padding: '40px 24px', background: '#f8fafc', minHeight: '100vh', display: 'flex', justifyContent: 'center' }}>
-      <div className="pub-modal" style={{ maxWidth: '900px', position: 'relative', height: 'fit-content', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}>
+    <div className="pc-page-wrapper" style={{ padding: '40px 24px', background: '#f8fafc', minHeight: '100vh' }}>
+      <div className="pc-contact-card" style={{ maxWidth: '1100px', margin: '0 auto', background: '#fff', borderRadius: 16, boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)' }}>
         <div className="pub-modal-header" style={{ padding: '24px 32px' }}>
           <h3 style={{ fontSize: '24px' }}>{isSubmitted ? 'Information Submitted' : 'Submit your information'}</h3>
           <button className="pub-modal-close" onClick={() => navigate(`/products/${id}`)}>
@@ -339,14 +339,14 @@ export default function ProductContact() {
           </div>
         ) : (
           <form onSubmit={handleSubmit} style={{ padding: '32px' }} noValidate>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '24px', marginBottom: '32px' }}>
-            {fields.map((field) => renderField(field))}
-          </div>
-          
-          <button type="submit" disabled={submitting} style={{ background: '#0f172a', color: '#fff', padding: '10px 32px', border: 'none', borderRadius: '4px', fontWeight: '600', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: submitting ? 0.7 : 1 }}>
-            {submitting ? 'Submitting...' : 'Send'}
-          </button>
-        </form>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '24px', marginBottom: '32px' }}>
+              {fields.map((field) => renderField(field))}
+            </div>
+
+            <button type="submit" disabled={submitting} style={{ background: '#0f172a', color: '#fff', padding: '10px 32px', border: 'none', borderRadius: '8px', fontWeight: '600', cursor: submitting ? 'not-allowed' : 'pointer', fontSize: '14px', opacity: submitting ? 0.7 : 1 }}>
+              {submitting ? 'Submitting...' : 'Send'}
+            </button>
+          </form>
         )}
       </div>
     </div>

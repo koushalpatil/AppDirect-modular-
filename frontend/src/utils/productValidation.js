@@ -224,11 +224,6 @@ export function validateProductForm(form) {
     errors.push('Product logo is required.');
   }
 
-  // Tags
-  if (!Array.isArray(form.tags) || form.tags.length === 0) {
-    errors.push('At least 1 tag is required.');
-  }
-
   // Overview
   const overviewItems = form.overview || [];
   if (overviewItems.length === 0) {

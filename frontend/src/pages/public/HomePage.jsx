@@ -39,22 +39,6 @@ export default function HomePage() {
 
   return (
     <div className="homepage">
-      {/* Hero Section */}
-      <section className="pub-hero">
-        {homepage.heroImage ? (
-          <div className="pub-hero-img-wrap">
-            <img src={homepage.heroImage} alt="Marketplace" className="pub-hero-img" />
-          </div>
-        ) : (
-          <div className="pub-hero-placeholder">
-            <div style={{ textAlign: 'center' }}>
-              <h1>Discover the Best Business Applications</h1>
-              <p>Find, compare, and integrate the top cloud solutions for your business</p>
-            </div>
-          </div>
-        )}
-      </section>
-
       {/* Sliding Images */}
       {homepage.slidingImages.length > 0 && (
         <section className="pub-slider-section">

@@ -1,14 +1,13 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { productAPI, catalogAPI, uploadAPI, configAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Check, Plus, Trash2, Upload, Image, AlertCircle, ChevronDown, ChevronUp } from 'lucide-react';
+import { Check, Plus, Trash2, Upload, Image, AlertCircle, ChevronDown, ChevronUp, MousePointer2 } from 'lucide-react';
 import './Admin.css';
 import {
   validateLogoFile,
   validateScreenshotFile,
   validateResourceFile,
-  validateTag,
   validateProductForm,
   LIMITS,
   LOGO_MAX_SIZE_MB,
@@ -41,6 +40,145 @@ function FieldError({ msg }) {
   );
 }
 
+function HelpTip({ text }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <span
+      style={{ display: 'inline-flex', alignItems: 'center', marginLeft: 6, position: 'relative' }}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+      tabIndex={0}
+      role="button"
+      aria-label={text}
+    >
+      <span
+        style={{
+          width: 16,
+          height: 16,
+          borderRadius: '50%',
+          background: '#fb923c',
+          color: '#fff',
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          cursor: 'pointer',
+          userSelect: 'none'
+        }}
+      >
+        <MousePointer2 size={10} />
+      </span>
+      {open && (
+        <span
+          style={{
+            position: 'absolute',
+            top: -8,
+            left: 22,
+            transform: 'translateY(-100%)',
+            background: '#111827',
+            color: '#fff',
+            fontSize: 12,
+            lineHeight: 1.35,
+            padding: '8px 10px',
+            borderRadius: 6,
+            width: 220,
+            zIndex: 30,
+            boxShadow: '0 8px 20px rgba(0,0,0,0.25)'
+          }}
+        >
+          {text}
+        </span>
+      )}
+    </span>
+  );
+}
+
+function MultiSelectDropdownField({ label, options, values = [], onChange, placeholder = 'Select one or more' }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (event) => {
+      if (!wrapperRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const toggleValue = (option) => {
+    if (values.includes(option)) {
+      onChange(values.filter((v) => v !== option));
+      return;
+    }
+    onChange([...values, option]);
+  };
+
+  const summaryText = values.length > 0 ? values.join(', ') : placeholder;
+
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }} ref={wrapperRef}>
+      <label className="form-label">{label}</label>
+      <button
+        type="button"
+        className="form-select"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ color: values.length ? '#0f172a' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {summaryText}
+        </span>
+        <ChevronDown size={14} style={{ color: '#64748b', flex: '0 0 auto' }} />
+      </button>
+
+      {open && (
+        <div style={{
+          marginTop: 8,
+          border: '1px solid #dbe3ef',
+          borderRadius: 10,
+          background: '#fff',
+          maxHeight: 220,
+          overflowY: 'auto',
+          boxShadow: '0 14px 28px rgba(2, 6, 23, 0.08)',
+          padding: 6,
+        }}>
+          {options.map((option) => (
+            <label
+              key={option}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={values.includes(option)}
+                onChange={() => toggleValue(option)}
+              />
+              <span style={{ color: '#334155', fontSize: 13 }}>{option}</span>
+            </label>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ProductCreate() {
   const navigate = useNavigate();
   const [step, setStep] = useState(0);
@@ -53,7 +191,6 @@ export default function ProductCreate() {
     tagline: '',
     developerName: '',
     logo: '',
-    tags: [],
     overview: [{ title: '', description: '', screenshots: [] }],
     features: [{ title: '', description: '', screenshots: [] }],
     customTabs: [],
@@ -63,7 +200,6 @@ export default function ProductCreate() {
     contactFields: [],
   });
 
-  const [tagInput, setTagInput] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingScreenshots, setUploadingScreenshots] = useState({});
   const [collapsedTabs, setCollapsedTabs] = useState({});
@@ -112,19 +248,6 @@ export default function ProductCreate() {
     }
   };
 
-  // ── Tag management ──────────────────────────────────────────────────────────
-  const addTag = () => {
-    const t = tagInput.trim();
-    const result = validateTag(t, form.tags);
-    if (!result.ok) {
-      toast.error(result.error);
-      return;
-    }
-    update('tags', [...form.tags, t]);
-    setTagInput('');
-  };
-  const removeTag = (tag) => update('tags', form.tags.filter(t => t !== tag));
-
   // ── Repeater helpers ────────────────────────────────────────────────────────
   const addRepeaterItem = (field) =>
     update(field, [...form[field], { title: '', description: '', screenshots: [] }]);
@@ -137,21 +260,50 @@ export default function ProductCreate() {
   };
 
   // ── Attribute management ────────────────────────────────────────────────────
-  const toggleAttribute = (attr) => {
-    const existing = form.attributes.find(a => a.attributeId === attr._id);
-    if (existing) {
-      update('attributes', form.attributes.filter(a => a.attributeId !== attr._id));
-    } else {
-      update('attributes', [
-        ...form.attributes,
-        { attributeId: attr._id, attributeName: attr.name, values: [] },
-      ]);
-    }
+  useEffect(() => {
+    if (!attributes.length) return;
+    const required = attributes.filter(a => a.requiredInProductEditor);
+    if (!required.length) return;
+
+    setForm(prev => {
+      const existingIds = new Set((prev.attributes || []).map(a => a.attributeId));
+      const missingRequired = required.filter(a => !existingIds.has(a._id));
+      if (!missingRequired.length) return prev;
+      return {
+        ...prev,
+        attributes: [
+          ...(prev.attributes || []),
+          ...missingRequired.map(a => ({ attributeId: a._id, attributeName: a.name, values: [] })),
+        ],
+      };
+    });
+  }, [attributes]);
+
+  const setAttributeValues = (attr, values) => {
+    const normalized = [...new Set((values || []).map(v => String(v).trim()).filter(Boolean))];
+    const shouldKeep = attr.requiredInProductEditor || normalized.length > 0;
+
+    setForm((prev) => {
+      const next = [...(prev.attributes || [])];
+      const idx = next.findIndex((a) => String(a.attributeId) === String(attr._id));
+
+      if (idx >= 0) {
+        if (shouldKeep) {
+          next[idx] = { ...next[idx], attributeId: attr._id, attributeName: attr.name, values: normalized };
+        } else {
+          next.splice(idx, 1);
+        }
+      } else if (shouldKeep) {
+        next.push({ attributeId: attr._id, attributeName: attr.name, values: normalized });
+      }
+
+      return { ...prev, attributes: next };
+    });
   };
-  const setAttributeValues = (attrId, values) => {
-    update('attributes', form.attributes.map(a =>
-      a.attributeId === attrId ? { ...a, values } : a
-    ));
+
+  const getAttributeValues = (attrId) => {
+    const existing = (form.attributes || []).find((a) => String(a.attributeId) === String(attrId));
+    return existing?.values || [];
   };
 
   // ── Logo upload with full validation ───────────────────────────────────────
@@ -378,7 +530,6 @@ export default function ProductCreate() {
       if (developerName.length < LIMITS.developerName.min) { toast.error(`Developer name must be at least ${LIMITS.developerName.min} characters`); return false; }
       if (developerName.length > LIMITS.developerName.max) { toast.error(`Developer name must be under ${LIMITS.developerName.max} characters`); return false; }
       if (!form.logo) { toast.error('Product logo is required'); return false; }
-      if (!form.tags.length) { toast.error('At least 1 tag is required'); return false; }
     }
     if (step === 1) {
       for (let i = 0; i < form.overview.length; i++) {
@@ -665,6 +816,9 @@ export default function ProductCreate() {
           <h1>Create Product</h1>
           <p>Add a new product to the marketplace</p>
         </div>
+        <button className="btn btn-secondary" onClick={() => navigate(-1)}>
+          ← Back
+        </button>
       </div>
 
       {/* Stepper */}
@@ -708,7 +862,7 @@ export default function ProductCreate() {
               disabled={saving}
               style={{ minWidth: '100px' }}
             >
-              {saving ? 'Publishing...' : 'Publish Product'}
+              {saving ? 'Publishing...' : 'Publish'}
             </button>
           ) : (
             <button
@@ -732,6 +886,7 @@ export default function ProductCreate() {
             <div className="form-group">
               <label className="form-label">
                 Product Name <span className="required">*</span>
+                <HelpTip text="Enter the public product name shown in the marketplace and product detail pages." />
                 <CharCount value={form.name} max={LIMITS.name.max} />
               </label>
               <input
@@ -754,6 +909,7 @@ export default function ProductCreate() {
             <div className="form-group">
               <label className="form-label">
                 Tagline <span className="required">*</span>
+                <HelpTip text="Write a short one-line description that appears under the product name." />
                 <CharCount value={form.tagline} max={LIMITS.tagline.max} />
               </label>
               <input
@@ -773,11 +929,11 @@ export default function ProductCreate() {
 
             {/* Product Logo */}
             <div className="form-group">
-              <label className="form-label">Product Logo <span className="required">*</span></label>
+              <label className="form-label">Product Logo <span className="required">*</span><HelpTip text="Upload the main brand logo used in cards, lists, and product header." /></label>
               <div style={{ fontSize: 11, color: '#9ca3af', marginBottom: 8 }}>
                 Accepted: JPEG, PNG, WebP, SVG · Max size: {LOGO_MAX_SIZE_MB}MB · Min 50×50px · Max 4096×4096px
               </div>
-              <div className="image-upload-area">
+              <div className="image-upload-area" style={{ padding: '12px' }}>
                 <input
                   type="file"
                   accept="image/jpeg,image/png,image/webp,image/svg+xml"
@@ -815,6 +971,7 @@ export default function ProductCreate() {
             <div className="form-group">
               <label className="form-label">
                 Developer Name <span className="required">*</span>
+                <HelpTip text="Name of the company or developer that owns the product." />
                 <CharCount value={form.developerName} max={LIMITS.developerName.max} />
               </label>
               <input
@@ -832,42 +989,6 @@ export default function ProductCreate() {
               </div>
             </div>
 
-            {/* Tags */}
-            <div className="form-group">
-              <label className="form-label">
-                Tags <span className="required">*</span>
-                <span style={{ fontSize: 11, color: '#9ca3af', float: 'right' }}>
-                  {form.tags.length}/{LIMITS.maxTags} tags · Max {LIMITS.tag.max} chars each
-                </span>
-              </label>
-              {form.tags.length < LIMITS.maxTags && (
-                <div className="option-input-row">
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Type a tag and press Enter or Add"
-                    maxLength={LIMITS.tag.max}
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={addTag}>
-                    Add
-                  </button>
-                </div>
-              )}
-              <div className="flex gap-sm flex-wrap mt-sm">
-                {form.tags.map(tag => (
-                  <span key={tag} className="tag">
-                    {tag}
-                    <span className="tag-remove" onClick={() => removeTag(tag)}>&times;</span>
-                  </span>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                At least 1 tag is required
-              </div>
-            </div>
           </div>
         </div>
       )}
@@ -883,7 +1004,7 @@ export default function ProductCreate() {
 
           {/* Resources (hardcoded) */}
           <div className="wizard-section">
-            <h3 className="wizard-section-title">Resources</h3>
+              <h3 className="wizard-section-title">Resources <HelpTip text="Attach downloadable documents such as brochures, datasheets, or specs." /></h3>
             <p className="text-muted" style={{ fontSize: 12, marginBottom: 16 }}>
               Upload PDF, Word, Excel, CSV or TXT documentation · Max {RESOURCE_MAX_SIZE_MB}MB per file
             </p>
@@ -943,7 +1064,7 @@ export default function ProductCreate() {
           {/* Custom Tabs */}
           <div className="wizard-section">
             <h3 className="wizard-section-title">
-              Custom Tabs
+              Custom Tabs <HelpTip text="Create additional content tabs with text and image slides." />
               <span style={{ fontSize: 12, fontWeight: 400, color: '#9ca3af', marginLeft: 8 }}>
                 {form.customTabs.length}/{LIMITS.maxCustomTabs} tabs
               </span>
@@ -985,7 +1106,7 @@ export default function ProductCreate() {
                     {/* Tab Name */}
                     <div className="form-group">
                       <label className="form-label">
-                        Tab Name <span className="required">*</span>
+                        Tab Name <span className="required">*</span><HelpTip text="This name appears as the tab title on the product detail page." />
                         <CharCount value={tab.tabName} max={LIMITS.customTabName.max} />
                       </label>
                       <input
@@ -1014,7 +1135,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Title <span className="required">*</span>
+                            Title <span className="required">*</span><HelpTip text="The title for this content block inside the tab." />
                             <CharCount value={el.title} max={LIMITS.customTabElementTitle.max} />
                           </label>
                           <input
@@ -1029,7 +1150,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Description <span className="required">*</span>
+                            Description <span className="required">*</span><HelpTip text="Add a concise description for this block. It supports longer text." />
                             <CharCount value={el.description} max={LIMITS.customTabElementDescription.max} warn={0.9} />
                           </label>
                           <textarea
@@ -1043,7 +1164,7 @@ export default function ProductCreate() {
 
                         <div className="form-group">
                           <label className="form-label">
-                            Images
+                            Images <HelpTip text="Upload screenshots or visuals for this tab block. Multiple images are allowed." />
                             <span style={{ fontSize: 11, color: '#9ca3af', float: 'right' }}>
                               {el.screenshots.length}/{SCREENSHOT_MAX_PER_SECTION} · Max 5MB each · JPEG/PNG/WebP/GIF
                             </span>
@@ -1105,19 +1226,19 @@ export default function ProductCreate() {
       {step === 2 && (
         <div className="wizard-content card card-body">
           <div className="wizard-section">
-            <h3 className="wizard-section-title">Attributes</h3>
+            <h3 className="wizard-section-title">Attributes <HelpTip text="Choose the catalog attributes that should be available for this product." /></h3>
             {attributes.length === 0 ? (
               <p className="text-muted" style={{ fontSize: '14px' }}>
-                No attributes configured. Go to Catalog Management to add attributes.
+                No attributes configured. Go to Attribute Management to add attributes.
               </p>
             ) : (
-              attributes.map(attr => {
-                const formAttr = form.attributes.find(a => a.attributeId === attr._id);
-                const isSelected = !!formAttr;
-                return (
-                  <div key={attr._id} className="repeater-item">
-                    <div className="flex items-center justify-between mb-md">
-                      <div>
+              <>
+                {attributes.map((attr) => {
+                  const selectedValues = getAttributeValues(attr._id);
+
+                  return (
+                    <div key={attr._id} className="repeater-item">
+                      <div className="mb-md">
                         <span style={{ fontWeight: 600 }}>{attr.name}</span>
                         {attr.requiredInProductEditor && (
                           <span className="required" style={{ marginLeft: 4 }}>*</span>
@@ -1128,37 +1249,24 @@ export default function ProductCreate() {
                           </p>
                         )}
                       </div>
-                      <label className="toggle">
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleAttribute(attr)}
+
+                      {attr.options.length > 0 ? (
+                        <MultiSelectDropdownField
+                          label={`Select ${attr.name} values`}
+                          options={attr.options}
+                          values={selectedValues}
+                          onChange={(vals) => setAttributeValues(attr, vals)}
+                          placeholder="Choose one or more"
                         />
-                        <span className="toggle-slider" />
-                      </label>
+                      ) : (
+                        <p className="text-muted" style={{ fontSize: 12, marginBottom: 0 }}>
+                          No predefined options for this attribute.
+                        </p>
+                      )}
                     </div>
-                    {isSelected && attr.options.length > 0 && (
-                      <div className="flex gap-sm flex-wrap">
-                        {attr.options.map(opt => (
-                          <button
-                            key={opt}
-                            type="button"
-                            className={`product-select-chip ${formAttr.values.includes(opt) ? 'selected' : ''}`}
-                            onClick={() => {
-                              const vals = formAttr.values.includes(opt)
-                                ? formAttr.values.filter(v => v !== opt)
-                                : [...formAttr.values, opt];
-                              setAttributeValues(attr._id, vals);
-                            }}
-                          >
-                            {opt}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })
+                  );
+                })}
+              </>
             )}
           </div>
         </div>
@@ -1168,7 +1276,7 @@ export default function ProductCreate() {
       {step === 3 && (
         <div className="wizard-content card card-body">
           <div className="wizard-section">
-            <h3 className="wizard-section-title">Contact Us Form</h3>
+            <h3 className="wizard-section-title">Contact Us Form <HelpTip text="Enable a custom contact form for this product, or use the default marketplace form." /></h3>
             <p className="text-muted" style={{ fontSize: 13, marginBottom: 24, paddingLeft: 4 }}>
               Decide whether to use the default marketplace contact form or create a custom one for this product.
             </p>

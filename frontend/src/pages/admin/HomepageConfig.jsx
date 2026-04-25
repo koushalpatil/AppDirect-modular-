@@ -1,23 +1,39 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { configAPI, catalogAPI, productAPI, uploadAPI } from '../../services/api';
 import toast from 'react-hot-toast';
-import { Plus, Trash2, Upload, Image, X } from 'lucide-react';
+import { Plus, Trash2, Image, ChevronDown, Pencil, Check, X } from 'lucide-react';
 import './Admin.css';
 
 export default function HomepageConfig() {
-  const [config, setConfig] = useState({ heroImage: '', slidingImages: [], homepageCategories: [] });
+  const navigate = useNavigate();
+  const [config, setConfig] = useState({ slidingImages: [], homepageCategories: [] });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [attributes, setAttributes] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
+  const [openProductDropdownIdx, setOpenProductDropdownIdx] = useState(null);
+  const [editCategoryIdx, setEditCategoryIdx] = useState(null);
+  const [editCategoryTitle, setEditCategoryTitle] = useState('');
+  const dropdownWrapperRef = useRef(null);
 
-  const [uploadingHero, setUploadingHero] = useState(false);
   const [uploadingSlider, setUploadingSlider] = useState(false);
 
   // For add category form
   const [categoryTitle, setCategoryTitle] = useState('');
 
   useEffect(() => { loadAll(); }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownWrapperRef.current && !dropdownWrapperRef.current.contains(e.target)) {
+        setOpenProductDropdownIdx(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const loadAll = async () => {
     try {
@@ -27,7 +43,6 @@ export default function HomepageConfig() {
         productAPI.getAll({ limit: 999, status: 'published' }),
       ]);
       setConfig({
-        heroImage: configRes.data.config?.heroImage || '',
         slidingImages: configRes.data.config?.slidingImages || [],
         homepageCategories: configRes.data.config?.homepageCategories || [],
       });
@@ -38,18 +53,6 @@ export default function HomepageConfig() {
     } finally {
       setLoading(false);
     }
-  };
-
-  // Hero image
-  const handleHeroUpload = async (e) => {
-    const file = e.target.files?.[0]; if (!file) return;
-    setUploadingHero(true);
-    try {
-      const res = await uploadAPI.single(file);
-      setConfig(prev => ({ ...prev, heroImage: res.data.url }));
-      toast.success('Hero image uploaded');
-    } catch { toast.error('Upload failed'); }
-    finally { setUploadingHero(false); }
   };
 
   // Sliding images
@@ -87,6 +90,45 @@ export default function HomepageConfig() {
 
   const removeCategory = (idx) => {
     setConfig(prev => ({ ...prev, homepageCategories: prev.homepageCategories.filter((_, i) => i !== idx) }));
+  };
+
+  const updateCategoryTitle = (idx, title) => {
+    setConfig(prev => {
+      const cats = [...prev.homepageCategories];
+      cats[idx] = { ...cats[idx], title };
+      return { ...prev, homepageCategories: cats };
+    });
+  };
+
+  const getCategoryDisplayTitle = (cat) => cat.title || `${cat.categoryName || 'Section'}${cat.categoryValue ? `: ${cat.categoryValue}` : ''}`;
+
+  const startEditCategoryTitle = (idx) => {
+    const cat = config.homepageCategories[idx];
+    setEditCategoryIdx(idx);
+    setEditCategoryTitle(cat?.title || '');
+  };
+
+  const cancelEditCategoryTitle = () => {
+    setEditCategoryIdx(null);
+    setEditCategoryTitle('');
+  };
+
+  const saveEditCategoryTitle = (idx) => {
+    const title = editCategoryTitle.trim();
+    if (!title) {
+      toast.error('Section title cannot be empty');
+      return;
+    }
+
+    const duplicate = config.homepageCategories.some((c, i) => i !== idx && (c.title || '').trim().toLowerCase() === title.toLowerCase());
+    if (duplicate) {
+      toast.error('This section title is already used');
+      return;
+    }
+
+    updateCategoryTitle(idx, title);
+    setEditCategoryIdx(null);
+    setEditCategoryTitle('');
   };
 
   const toggleProductInCategory = (catIdx, productId) => {
@@ -132,27 +174,11 @@ export default function HomepageConfig() {
           <h1>Homepage Configuration</h1>
           <p>Configure the marketplace homepage layout</p>
         </div>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving...' : 'Save Changes'}
-        </button>
-      </div>
-
-      <div className="homepage-section">
-        <h3 className="wizard-section-title">Hero Image</h3>
-        <div className="image-upload-area">
-          <input type="file" accept="image/*" onChange={handleHeroUpload} disabled={uploadingHero} />
-          {uploadingHero ? (
-            <div style={{ padding: 30, display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-              <div className="spinner mb-sm" />
-              <p className="text-muted">Uploading...</p>
-            </div>
-          ) : config.heroImage ? (
-            <img src={config.heroImage} alt="Hero" className="image-preview" />
-          ) : (
-            <div style={{ padding: 30, color: 'var(--text-muted)' }}>
-              <Upload size={28} style={{ margin: '0 auto 8px' }} /><p>Upload hero image</p>
-            </div>
-          )}
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
+          <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : 'Save Changes'}
+          </button>
         </div>
       </div>
 
@@ -180,12 +206,14 @@ export default function HomepageConfig() {
 
       {/* Categories */}
       <div className="homepage-section">
-        <h3 className="wizard-section-title">Featured Products & Categories</h3>
-        <p className="text-muted mb-md" style={{ fontSize: 13 }}>Select categories to display on the homepage and choose which products appear under each.</p>
+        <h3 className="wizard-section-title">Homepage Product Sections</h3>
+        <p className="text-muted mb-md" style={{ fontSize: 13 }}>
+          Create configurable section titles and choose which products should be shown on the homepage UI under each section.
+        </p>
 
         <div className="flex gap-sm mb-lg flex-wrap items-center" style={{ alignItems: 'flex-end' }}>
           <div className="form-group" style={{ marginBottom: 0, minWidth: 280 }}>
-            <label className="form-label">Section Title</label>
+            <label className="form-label">Configurable Section Title</label>
             <input
               type="text"
               className="form-input"
@@ -197,37 +225,127 @@ export default function HomepageConfig() {
             />
           </div>
           <button className="btn btn-secondary" onClick={addCategory} style={{ height: 42 }}>
-            <Plus size={16} /> Add Category
+            <Plus size={16} /> Add Section
           </button>
         </div>
 
         {config.homepageCategories.map((cat, catIdx) => (
           <div key={catIdx} className="category-config-card">
             <div className="category-config-header">
-              <div>
-                <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{cat.title || `${cat.categoryName}: ${cat.categoryValue}`}</span>
+              <div style={{ flex: 1, minWidth: 240 }}>
+                {editCategoryIdx === catIdx ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, maxWidth: 520 }}>
+                    <input
+                      type="text"
+                      className="form-input"
+                      value={editCategoryTitle}
+                      maxLength={100}
+                      placeholder="Section name (e.g., Trending Partners)"
+                      onChange={(e) => setEditCategoryTitle(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          saveEditCategoryTitle(catIdx);
+                        }
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          cancelEditCategoryTitle();
+                        }
+                      }}
+                      autoFocus
+                    />
+                    <button type="button" className="btn btn-icon btn-ghost" title="Save title" onClick={() => saveEditCategoryTitle(catIdx)}>
+                      <Check size={14} />
+                    </button>
+                    <button type="button" className="btn btn-icon btn-ghost" title="Cancel edit" onClick={cancelEditCategoryTitle}>
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontWeight: 700, color: 'var(--text-primary)' }}>{getCategoryDisplayTitle(cat)}</span>
+                    <button type="button" className="btn btn-icon btn-ghost" title="Edit title" onClick={() => startEditCategoryTitle(catIdx)}>
+                      <Pencil size={14} />
+                    </button>
+                  </div>
+                )}
               </div>
               <button className="btn btn-icon btn-ghost" onClick={() => removeCategory(catIdx)}><Trash2 size={14} /></button>
             </div>
-            <p className="text-muted mb-md" style={{ fontSize: 12 }}>Select products to display under this category:</p>
-            <div className="category-products-list">
-              {allProducts.map(prod => {
+            <p className="text-muted mb-md" style={{ fontSize: 12 }}>Select products to display under this section on the homepage:</p>
+            <div className="form-group" style={{ marginBottom: 0 }} ref={openProductDropdownIdx === catIdx ? dropdownWrapperRef : null}>
+              {(() => {
                 const prodIds = cat.products.map(p => typeof p === 'string' ? p : p._id);
-                const isSelected = prodIds.includes(prod._id);
+                const selectedNames = allProducts.filter((p) => prodIds.includes(p._id)).map((p) => p.name);
                 return (
-                  <button key={prod._id} className={`product-select-chip ${isSelected ? 'selected' : ''}`} onClick={() => toggleProductInCategory(catIdx, prod._id)}>
-                    {prod.name}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className="form-select"
+                      onClick={() => setOpenProductDropdownIdx((prev) => (prev === catIdx ? null : catIdx))}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        textAlign: 'left',
+                        cursor: 'pointer',
+                      }}
+                    >
+                      <span style={{ color: selectedNames.length ? '#0f172a' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                        {selectedNames.length ? selectedNames.join(', ') : 'Select one or more products'}
+                      </span>
+                      <ChevronDown size={14} style={{ color: '#64748b', flex: '0 0 auto' }} />
+                    </button>
+
+                    {openProductDropdownIdx === catIdx && (
+                      <div style={{
+                        marginTop: 8,
+                        border: '1px solid #dbe3ef',
+                        borderRadius: 10,
+                        background: '#fff',
+                        maxHeight: 260,
+                        overflowY: 'auto',
+                        boxShadow: '0 14px 28px rgba(2, 6, 23, 0.08)',
+                        padding: 6,
+                      }}>
+                        {allProducts.map((prod) => {
+                          const isSelected = prodIds.includes(prod._id);
+                          return (
+                            <label
+                              key={prod._id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 8,
+                                padding: '8px 10px',
+                                borderRadius: 8,
+                                cursor: 'pointer',
+                              }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleProductInCategory(catIdx, prod._id)}
+                              />
+                              <span style={{ color: '#334155', fontSize: 13 }}>{prod.name}</span>
+                            </label>
+                          );
+                        })}
+                        {allProducts.length === 0 && <p className="text-muted" style={{ fontSize: 12, margin: 8 }}>No published products available</p>}
+                      </div>
+                    )}
+                  </>
                 );
-              })}
-              {allProducts.length === 0 && <p className="text-muted" style={{ fontSize: 12 }}>No published products available</p>}
+              })()}
             </div>
+
           </div>
         ))}
 
         {config.homepageCategories.length === 0 && (
           <div className="glass-card text-center" style={{ padding: 40 }}>
-            <p className="text-muted">No categories configured yet. Add categories above to organize your homepage.</p>
+            <p className="text-muted">No homepage sections configured yet. Add sections above and select products to show on the homepage.</p>
           </div>
         )}
       </div>

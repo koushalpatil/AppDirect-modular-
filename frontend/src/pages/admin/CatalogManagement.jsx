@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { catalogAPI } from '../../services/api';
 import toast from 'react-hot-toast';
 import { Plus, Edit3, Trash2, FolderTree, X } from 'lucide-react';
@@ -34,12 +35,16 @@ function FieldError({ msg }) {
 }
 
 export default function CatalogManagement() {
+  const navigate = useNavigate();
   const [attributes, setAttributes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modalOpen, setModalOpen] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const [editing, setEditing] = useState(null);
   const [optionInput, setOptionInput] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [deleteTarget, setDeleteTarget] = useState(null);
+  const [expandedOptionsByAttr, setExpandedOptionsByAttr] = useState({});
 
   const [form, setForm] = useState({
     name: '', description: '',
@@ -73,6 +78,7 @@ export default function CatalogManagement() {
       similarity: { useInSimilarity: false, weight: 1, matchType: 'exact' },
     });
     setEditing(null);
+    setShowAdvanced(false);
     setOptionInput('');
     setFieldErrors({});
   };
@@ -90,6 +96,7 @@ export default function CatalogManagement() {
       similarity: attr.similarity || { useInSimilarity: false, weight: 1, matchType: 'exact' },
     });
     setEditing(attr._id);
+    setShowAdvanced(false);
     setModalOpen(true);
   };
 
@@ -119,12 +126,6 @@ export default function CatalogManagement() {
       errors.description = `Description too long (max ${LIMITS.description.max} characters)`;
     }
 
-    if (form.similarity.useInSimilarity) {
-      const w = form.similarity.weight;
-      if (w === '' || isNaN(w)) errors.weight = 'Weight is required';
-      else if (w < 0 || w > 10) errors.weight = 'Weight must be 0-10';
-    }
-
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
       toast.error('Please fix the errors in the form');
@@ -148,8 +149,7 @@ export default function CatalogManagement() {
     }
   };
 
-  const handleDelete = async (id, name) => {
-    if (!window.confirm(`Delete "${name}"? This cannot be undone.`)) return;
+  const handleDelete = async (id) => {
     try {
       await catalogAPI.delete(id);
       toast.success('Attribute deleted');
@@ -159,18 +159,34 @@ export default function CatalogManagement() {
     }
   };
 
+  const confirmDelete = async () => {
+    if (!deleteTarget) return;
+    const target = deleteTarget;
+    setDeleteTarget(null);
+    if (target.required) {
+      toast.error('Required attributes cannot be deleted because they are used in the product editor.');
+      return;
+    }
+    await handleDelete(target.id);
+  };
+
   if (loading) return <div className="page-loader"><div className="spinner" /></div>;
 
   return (
     <div className="fade-in">
       <div className="page-header">
         <div>
-          <h1>Catalog Management</h1>
+          <h1>Attribute Management</h1>
           <p>Manage product attributes and options</p>
         </div>
-        <button className="btn btn-primary" onClick={openCreate}>
-          <Plus size={16} /> Add Attribute
-        </button>
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
+          <button className="btn btn-primary" onClick={openCreate}>
+            <Plus size={16} /> Add Attribute
+          </button>
+        </div>
       </div>
 
       {attributes.length === 0 ? (
@@ -207,8 +223,29 @@ export default function CatalogManagement() {
                   </td>
                   <td>
                     <div className="flex gap-sm flex-wrap" style={{ maxWidth: 300 }}>
-                      {(attr.options || []).slice(0, 4).map(o => <span key={o} className="tag">{o}</span>)}
-                      {(attr.options || []).length > 4 && <span className="tag">+{attr.options.length - 4}</span>}
+                      {(expandedOptionsByAttr[attr._id] ? (attr.options || []) : (attr.options || []).slice(0, 5)).map(o => (
+                        <span key={o} className="tag">{o}</span>
+                      ))}
+                      {(attr.options || []).length > 5 && !expandedOptionsByAttr[attr._id] && (
+                        <button
+                          type="button"
+                          className="tag"
+                          onClick={() => setExpandedOptionsByAttr(prev => ({ ...prev, [attr._id]: true }))}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                        >
+                          +{attr.options.length - 5}
+                        </button>
+                      )}
+                      {(attr.options || []).length > 5 && expandedOptionsByAttr[attr._id] && (
+                        <button
+                          type="button"
+                          className="tag"
+                          onClick={() => setExpandedOptionsByAttr(prev => ({ ...prev, [attr._id]: false }))}
+                          style={{ cursor: 'pointer', border: 'none' }}
+                        >
+                          Show less
+                        </button>
+                      )}
                     </div>
                   </td>
                   <td><span className={`badge ${attr.displayOnHomepage ? 'badge-success' : 'badge-primary'}`}>{attr.displayOnHomepage ? 'Yes' : 'No'}</span></td>
@@ -218,7 +255,7 @@ export default function CatalogManagement() {
                   <td>
                     <div className="flex gap-xs">
                       <button className="btn btn-icon btn-ghost" onClick={() => openEdit(attr)} title="Edit"><Edit3 size={14} /></button>
-                      <button className="btn btn-icon btn-ghost" onClick={() => handleDelete(attr._id, attr.name)} title="Delete"><Trash2 size={14} /></button>
+                      <button className="btn btn-icon btn-ghost" onClick={() => setDeleteTarget({ id: attr._id, name: attr.name, required: attr.requiredInProductEditor, linked: attr.linkedProductsCount || 0 })} title="Delete"><Trash2 size={14} /></button>
                     </div>
                   </td>
                 </tr>
@@ -228,10 +265,29 @@ export default function CatalogManagement() {
         </div>
       )}
 
+      {deleteTarget && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(15, 23, 42, 0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1200, padding: 24 }}>
+          <div style={{ width: '100%', maxWidth: 420, background: '#fff', borderRadius: 16, padding: 24, boxShadow: '0 24px 60px rgba(0,0,0,0.2)' }}>
+            <h3 style={{ fontSize: 18, fontWeight: 800, color: '#0f172a', marginBottom: 8 }}>
+              {deleteTarget.required ? 'Required attribute cannot be deleted' : 'Delete attribute?'}
+            </h3>
+            <p style={{ color: '#64748b', lineHeight: 1.5, marginBottom: 20 }}>
+              {deleteTarget.required
+                ? `“${deleteTarget.name}” is required in the product editor, so it must stay available for products that depend on it.`
+                : `This will permanently remove “${deleteTarget.name}”. ${deleteTarget.linked > 0 ? `It is currently used by ${deleteTarget.linked} product(s).` : 'No products are currently using it.'}`}
+            </p>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
+              <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>{deleteTarget.required ? 'OK' : 'Cancel'}</button>
+              {!deleteTarget.required && <button className="btn btn-primary" onClick={confirmDelete}>Delete</button>}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal */}
       {modalOpen && (
-        <div className="modal-overlay" onClick={() => setModalOpen(false)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-overlay right-panel-overlay" onClick={() => setModalOpen(false)}>
+          <div className="modal side-panel attribute-side-panel" onClick={e => e.stopPropagation()}>
             <div className="modal-header">
               <h3 className="modal-title">{editing ? 'Edit Attribute' : 'Add Attribute'}</h3>
               <button className="btn btn-icon btn-ghost" onClick={() => setModalOpen(false)}><X size={18} /></button>
@@ -275,68 +331,14 @@ export default function CatalogManagement() {
                 <FieldError msg={fieldErrors.description} />
               </div>
 
-              <div className="toggle-wrapper">
-                <span className="toggle-label">Display on the marketplace homepage</span>
-                <label className="toggle"><input type="checkbox" checked={form.displayOnHomepage} onChange={(e) => setForm(prev => ({ ...prev, displayOnHomepage: e.target.checked }))} /><span className="toggle-slider" /></label>
-              </div>
-              <div className="toggle-wrapper">
-                <span className="toggle-label">Make this a required field in the product editor</span>
-                <label className="toggle"><input type="checkbox" checked={form.requiredInProductEditor} onChange={(e) => setForm(prev => ({ ...prev, requiredInProductEditor: e.target.checked }))} /><span className="toggle-slider" /></label>
-              </div>
-              <div className="toggle-wrapper">
-                <span className="toggle-label">Show for filtering option</span>
-                <label className="toggle"><input type="checkbox" checked={form.showForFiltering} onChange={(e) => setForm(prev => ({ ...prev, showForFiltering: e.target.checked }))} /><span className="toggle-slider" /></label>
-              </div>
-
-              <div style={{ padding: '16px', background: 'var(--bg-secondary)', borderRadius: '8px', marginTop: '20px' }}>
-                <h4 style={{ fontSize: '14px', marginBottom: '12px', fontWeight: 600 }}>Similarity Configuration</h4>
-                <div className="toggle-wrapper" style={{ border: 'none', padding: 0, marginBottom: '12px' }}>
-                  <span className="toggle-label">Use in product similarity engine</span>
-                  <label className="toggle"><input type="checkbox" checked={form.similarity.useInSimilarity} onChange={(e) => setForm(prev => ({ ...prev, similarity: { ...prev.similarity, useInSimilarity: e.target.checked } }))} /><span className="toggle-slider" /></label>
-                </div>
-                
-                {form.similarity.useInSimilarity && (
-                  <div className="grid-2 mt-sm">
-                    <div className="form-group mb-0">
-                      <label className="form-label">Weight (0-10)</label>
-                      <input 
-                        type="number" 
-                        className={`form-input ${fieldErrors.weight ? 'form-input-error' : ''}`} 
-                        min="0" 
-                        max="10" 
-                        step="0.5" 
-                        value={form.similarity.weight === '' ? '' : form.similarity.weight} 
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setForm(prev => ({ 
-                            ...prev, 
-                            similarity: { 
-                              ...prev.similarity, 
-                              weight: val === '' ? '' : Number(val) 
-                            } 
-                          }));
-                          setFieldErrors(prev => ({ ...prev, weight: null }));
-                        }} 
-                      />
-                      <FieldError msg={fieldErrors.weight} />
-                    </div>
-                    <div className="form-group mb-0">
-                      <label className="form-label">Match Type</label>
-                      <select className="form-select" value={form.similarity.matchType} onChange={(e) => setForm(prev => ({ ...prev, similarity: { ...prev.similarity, matchType: e.target.value } }))}>
-                        <option value="exact">Exact Match</option>
-                        <option value="overlap">Overlap (at least one)</option>
-                        <option value="partial">Partial Match</option>
-                      </select>
-                    </div>
-                  </div>
-                )}
-              </div>
-
               <div className="form-group mt-md">
                 <label className="form-label">Options</label>
                 <div className="option-input-row">
                   <input type="text" className="form-input" placeholder="Add option value" value={optionInput} maxLength={LIMITS.option.max} onChange={(e) => setOptionInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addOption())} />
                   <button type="button" className="btn btn-secondary" onClick={addOption}>Add</button>
+                </div>
+                <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
+                  Option character limit: {LIMITS.option.max}
                 </div>
                 <div className="flex gap-sm flex-wrap mt-sm">
                   {form.options.map(opt => (
@@ -344,6 +346,29 @@ export default function CatalogManagement() {
                   ))}
                 </div>
               </div>
+
+              <div style={{ marginTop: 18 }}>
+                <button type="button" className="btn btn-secondary" onClick={() => setShowAdvanced(prev => !prev)}>
+                  {showAdvanced ? 'Hide Advanced Settings' : 'Advanced Settings'}
+                </button>
+              </div>
+
+              {showAdvanced && (
+                <>
+                  <div className="toggle-wrapper">
+                    <span className="toggle-label">Show in Additional Settings</span>
+                    <label className="toggle"><input type="checkbox" checked={form.displayOnHomepage} onChange={(e) => setForm(prev => ({ ...prev, displayOnHomepage: e.target.checked }))} /><span className="toggle-slider" /></label>
+                  </div>
+                  <div className="toggle-wrapper">
+                    <span className="toggle-label">Make this field required in the product editor</span>
+                    <label className="toggle"><input type="checkbox" checked={form.requiredInProductEditor} onChange={(e) => setForm(prev => ({ ...prev, requiredInProductEditor: e.target.checked }))} /><span className="toggle-slider" /></label>
+                  </div>
+                  <div className="toggle-wrapper">
+                    <span className="toggle-label">Allow for filtering</span>
+                    <label className="toggle"><input type="checkbox" checked={form.showForFiltering} onChange={(e) => setForm(prev => ({ ...prev, showForFiltering: e.target.checked }))} /><span className="toggle-slider" /></label>
+                  </div>
+                </>
+              )}
             </div>
             <div className="modal-footer">
               <button className="btn btn-secondary" onClick={() => setModalOpen(false)}>Cancel</button>

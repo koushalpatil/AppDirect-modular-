@@ -6,6 +6,26 @@ import { ChevronDown, Search, LogOut, Menu, X } from 'lucide-react';
 import dblogo from '../assets/dblogo.png';
 import './PublicLayout.css';
 
+const companyLinks = [
+  { label: 'Our Story', url: 'https://darwinbox.com/about-us/our-story/' },
+  { label: 'Customers', url: 'https://explore.darwinbox.com/resources/customer-success-stories' },
+  { label: 'Partners', url: 'https://explore.darwinbox.com/darwinbox-partners' },
+  { label: 'Newsroom', url: 'https://newsroom.darwinbox.com/' },
+  { label: 'Careers', url: 'https://dbx.darwinbox.in/ms/candidatev2/main/careers/allJobs' },
+];
+
+const resourcesLinks = [
+  { label: 'Blog', url: 'https://blog.darwinbox.com/' },
+  { label: 'Case Studies', url: 'https://explore.darwinbox.com/resources/customer-success-stories' },
+  { label: 'Industry Reports', url: 'https://explore.darwinbox.com/resources/think-tank#industry-reports' },
+  { label: 'E-Books', url: 'https://explore.darwinbox.com/resources/think-tank#ebooks' },
+  { label: 'Events', url: 'https://explore.darwinbox.com/resources/events' },
+  { label: 'Product Tours', url: 'https://explore.darwinbox.com/resources/think-tank#productTours' },
+  { label: 'HR Glossary', url: 'https://explore.darwinbox.com/hr-glossary' },
+];
+
+const partnerLink = { label: 'Become a Partner', url: 'https://explore.darwinbox.com/darwinbox-partners' };
+
 // Inline SVG social media icons
 const SocialIcon = ({ platform }) => {
   const icons = {
@@ -40,7 +60,10 @@ export default function PublicLayout() {
   const [searchQuery, setSearchQuery] = useState('');
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [openMenu, setOpenMenu] = useState(null);
   const dropdownRef = useRef(null);
+  const topMenuRef = useRef(null);
+  const menuCloseTimeoutRef = useRef(null);
   const timeoutRef = useRef(null);
   const searchTimeoutRef = useRef(null);
 
@@ -50,6 +73,20 @@ export default function PublicLayout() {
   useEffect(() => {
     loadCategories();
     loadFooter();
+  }, []);
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+      if (topMenuRef.current && !topMenuRef.current.contains(e.target)) {
+        setOpenMenu(null);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const loadFooter = async () => {
@@ -134,16 +171,6 @@ export default function PublicLayout() {
     return `/products?${params.toString()}`;
   };
 
-  useEffect(() => {
-    const handleClickOutside = (e) => {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchQuery(val);
@@ -188,6 +215,41 @@ export default function PublicLayout() {
     footerData.bottomFooterCopyright
   );
 
+  const openTopMenu = (label) => {
+    if (menuCloseTimeoutRef.current) clearTimeout(menuCloseTimeoutRef.current);
+    setOpenMenu(label);
+  };
+
+  const closeTopMenu = () => {
+    if (menuCloseTimeoutRef.current) clearTimeout(menuCloseTimeoutRef.current);
+    menuCloseTimeoutRef.current = setTimeout(() => setOpenMenu(null), 180);
+  };
+
+  const renderTopMenu = (label, links) => (
+    <div
+      className="pub-nav-dropdown pub-nav-dropdown-menu"
+      onMouseEnter={() => openTopMenu(label)}
+      onMouseLeave={closeTopMenu}
+    >
+      <button
+        type="button"
+        className="pub-nav-trigger pub-nav-trigger-button"
+        onClick={() => setOpenMenu((current) => (current === label ? null : label))}
+      >
+        {label} <ChevronDown size={14} />
+      </button>
+      {openMenu === label && (
+        <div className="pub-nav-menu-panel" onMouseEnter={() => openTopMenu(label)} onMouseLeave={closeTopMenu}>
+          {links.map((item) => (
+            <a key={item.label} href={item.url} className="pub-nav-menu-link" target="_blank" rel="noopener noreferrer">
+              {item.label}
+            </a>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+
   return (
     <div className="pub-layout">
       {/* Top Blue Header */}
@@ -196,6 +258,13 @@ export default function PublicLayout() {
           <Link to="/" className="pub-brand">
             <img src={dblogo} alt="Darwinbox" className="pub-header-logo" />
           </Link>
+          <div className="pub-top-links" ref={topMenuRef}>
+            {renderTopMenu('Company', companyLinks)}
+            {renderTopMenu('Resources', resourcesLinks)}
+            <a href={partnerLink.url} className="pub-top-link pub-top-external-link" target="_blank" rel="noopener noreferrer">
+              {partnerLink.label}
+            </a>
+          </div>
           <div className="pub-top-actions">
             {user ? (
               <div className="pub-user-area">
@@ -273,7 +342,7 @@ export default function PublicLayout() {
                             {categoryProducts.map(p => (
                               <Link
                                 key={p._id}
-                                to={getCategoryProductFilterUrl(hoveredCategory, p._id)}
+                                to={`/products/${p._id}`}
                                 className="pub-mega-item"
                                 onClick={() => setMegaMenuOpen(false)}
                               >

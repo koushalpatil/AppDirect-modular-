@@ -187,9 +187,9 @@ function PortalModal({ open, onClose, children, maxWidth = 600 }) {
   useBodyScrollLock(open);
   if (!open) return null;
   return createPortal(
-    <div className="modal-overlay" onClick={onClose} style={{ isolation: 'isolate' }}>
+    <div className="modal-overlay right-panel-overlay" onClick={onClose} style={{ isolation: 'isolate' }}>
       <div
-        className="modal"
+        className="modal side-panel"
         style={{ maxWidth }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -527,6 +527,7 @@ export default function ContactFieldEditor({ fields, setFields }) {
   const [optionInput, setOptionInput] = useState({ label: '', value: '' });
   const [modalErrors, setModalErrors] = useState({});
   const [fieldForm, setFieldForm] = useState(buildEmptyField(0));
+  const [removePromptIndex, setRemovePromptIndex] = useState(null);
 
   // Fresh fields ref (avoids stale closures)
   const fieldsRef = useRef(fields);
@@ -579,7 +580,10 @@ export default function ContactFieldEditor({ fields, setFields }) {
 
   const removeField = useCallback((idx) => {
     const current = fieldsRef.current;
-    if (current[idx]?.isDefault && !window.confirm('This is a default field. Remove it?')) return;
+    if (current[idx]?.isDefault) {
+      setRemovePromptIndex(idx);
+      return;
+    }
     setFields(current.filter((_, i) => i !== idx).map((f, i) => ({ ...f, order: i })));
   }, [setFields]);
 
@@ -724,6 +728,33 @@ export default function ContactFieldEditor({ fields, setFields }) {
         </div>
         <div className="modal-footer">
           <button className="btn btn-secondary" onClick={closeModal}>Close Preview</button>
+        </div>
+      </PortalModal>
+
+      <PortalModal open={removePromptIndex !== null} onClose={() => setRemovePromptIndex(null)} maxWidth={420}>
+        <div className="modal-header">
+          <h3 className="modal-title">Remove default field?</h3>
+          <button className="btn btn-icon btn-ghost" onClick={() => setRemovePromptIndex(null)}><X size={18} /></button>
+        </div>
+        <div className="modal-body">
+          <p style={{ color: '#475569', lineHeight: 1.5 }}>
+            This is a default field in the public contact form. Removing it will hide it for all users.
+          </p>
+        </div>
+        <div className="modal-footer">
+          <button className="btn btn-secondary" onClick={() => setRemovePromptIndex(null)}>Cancel</button>
+          <button
+            className="btn btn-primary"
+            onClick={() => {
+              const idx = removePromptIndex;
+              setRemovePromptIndex(null);
+              if (idx === null) return;
+              const current = fieldsRef.current;
+              setFields(current.filter((_, i) => i !== idx).map((f, i) => ({ ...f, order: i })));
+            }}
+          >
+            Remove Field
+          </button>
         </div>
       </PortalModal>
 

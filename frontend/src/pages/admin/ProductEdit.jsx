@@ -644,6 +644,9 @@ export default function ProductEdit() {
           <p>{form.name}</p>
         </div>
         <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>
+            ← Back
+          </button>
           <button className="btn btn-secondary" onClick={loadLogs}>
             <Clock size={16} /> Edit Logs
           </button>
@@ -691,7 +694,7 @@ export default function ProductEdit() {
               disabled={saving}
               style={{ minWidth: '100px' }}
             >
-              {saving ? 'Saving...' : 'Save Changes'}
+              {saving ? 'Publishing...' : 'Publish'}
             </button>
           ) : (
             <button

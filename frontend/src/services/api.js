@@ -40,9 +40,6 @@ export const configAPI = {
   updateContact: (data) => api.put('/config/contact', data),
   getHomepage: () => api.get('/config/homepage'),
   updateHomepage: (data) => api.put('/config/homepage', data),
-  // Admin Similarity
-  getSimilarity: () => api.get('/config/similarity'),
-  updateSimilarity: (data) => api.put('/config/similarity', data),
   // Public
   getPublicHomepage: () => api.get('/config/public/homepage'),
   getPublicContactForm: () => api.get('/config/public/contact-form'),

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import {
-  LayoutDashboard, Package, FolderTree, FileText, Settings, LogOut, Home, ChevronRight, Zap, PanelBottom, Menu, X
+  LayoutDashboard, Package, FolderTree, FileText, Settings, LogOut, Home, ChevronRight, PanelBottom, Menu, X
 } from 'lucide-react';
 import dbLogo from '../assets/dblogo1.jpg';
 import './AdminLayout.css';
@@ -24,10 +24,9 @@ export default function AdminLayout() {
   const navItems = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard', end: true },
     { to: '/admin/products', icon: Package, label: 'Products' },
-    { to: '/admin/catalog', icon: FolderTree, label: 'Catalog' },
+    { to: '/admin/catalog', icon: FolderTree, label: 'Attribute' },
     { to: '/admin/config/contact', icon: FileText, label: 'Contact Form' },
     { to: '/admin/config/homepage', icon: Settings, label: 'Homepage Config' },
-    { to: '/admin/config/similarity', icon: Zap, label: 'Similarity Settings' },
     { to: '/admin/config/footer', icon: PanelBottom, label: 'Footer Config' },
   ];
 
@@ -73,11 +72,11 @@ export default function AdminLayout() {
           </NavLink>
           <div className="sidebar-user">
             <div className="user-avatar">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
+              DA
             </div>
             <div className="user-info">
-              <span className="user-name">{user?.firstName} {user?.lastName}</span>
-              <span className="user-role">{user?.role}</span>
+              <span className="user-name">Darwinbox admin</span>
+              <span className="user-role">admin</span>
             </div>
             <button className="btn-icon btn-ghost" onClick={handleLogout} title="Logout">
               <LogOut size={16} />

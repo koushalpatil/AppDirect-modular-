@@ -559,6 +559,28 @@
   animation: slideUp 300ms ease-out;
 }
 
+.right-panel-overlay {
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 0;
+}
+
+.modal.side-panel {
+  margin-left: auto;
+  height: 100vh;
+  max-height: 100vh;
+  border-radius: 0;
+  border-top-left-radius: var(--border-radius-xl);
+  border-bottom-left-radius: var(--border-radius-xl);
+  animation: slideInRight 220ms ease-out;
+}
+
+.modal.side-panel.attribute-side-panel {
+  border-radius: 0;
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
 .modal-header {
   padding: var(--space-lg) var(--space-xl);
   border-bottom: 1px solid var(--border-color);
@@ -611,6 +633,11 @@
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(28px); }
+  to { opacity: 1; transform: translateX(0); }
 }
 
 @media (max-width: 1024px) {
@@ -851,6 +878,22 @@
     max-width: calc(100vw - 32px);
     margin: 16px;
     overflow-x: hidden;
+  }
+
+  .right-panel-overlay {
+    justify-content: center;
+    align-items: center;
+    padding: var(--space-lg);
+  }
+
+  .modal.side-panel {
+    height: auto;
+    max-height: 90vh;
+    border-radius: var(--border-radius-xl);
+  }
+
+  .modal.side-panel.attribute-side-panel {
+    border-radius: 0;
   }
 
   .modal-body {

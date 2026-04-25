@@ -1,10 +1,11 @@
 import { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { productAPI, catalogAPI } from '../../services/api';
 import { Package, FolderTree, TrendingUp, FileText } from 'lucide-react';
 import './Admin.css';
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState({ products: 0, published: 0, drafts: 0, attributes: 0 });
 
   useEffect(() => {
@@ -45,9 +46,12 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p>Overview of your marketplace</p>
         </div>
-        <Link to="/admin/products/new" className="btn btn-primary">
-          <Package size={16} /> New Product
-        </Link>
+        <div className="page-actions">
+          <button className="btn btn-secondary" onClick={() => navigate(-1)}>← Back</button>
+          <Link to="/admin/products/new" className="btn btn-primary">
+            <Package size={16} /> Create Product
+          </Link>
+        </div>
       </div>
 
       <div className="stats-grid">
@@ -75,7 +79,7 @@ export default function Dashboard() {
           </Link>
           <Link to="/admin/catalog" className="quick-action-card card">
             <FolderTree size={20} />
-            <span>Manage Catalog</span>
+            <span>Manage Attributes</span>
           </Link>
           <Link to="/admin/config/contact" className="quick-action-card card">
             <FileText size={20} />
