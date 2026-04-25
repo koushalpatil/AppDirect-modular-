@@ -8,7 +8,6 @@ import {
   validateLogoFile,
   validateScreenshotFile,
   validateResourceFile,
-  validateTag,
   validateProductForm,
   LIMITS,
   LOGO_MAX_SIZE_MB,
@@ -133,7 +132,6 @@ export default function ProductEdit() {
   const [attributes, setAttributes] = useState([]);
   const [logs, setLogs] = useState([]);
   const [showLogs, setShowLogs] = useState(false);
-  const [tagInput, setTagInput] = useState('');
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingScreenshots, setUploadingScreenshots] = useState({});
   const [fieldErrors, setFieldErrors] = useState({});
@@ -146,7 +144,6 @@ export default function ProductEdit() {
     tagline: '',
     developerName: '',
     logo: '',
-    tags: [],
     overview: [],
     features: [],
     customTabs: [],
@@ -179,7 +176,6 @@ export default function ProductEdit() {
         tagline: p.tagline || '',
         developerName: p.developerName || '',
         logo: p.logo || '',
-        tags: p.tags || [],
         overview: p.overview?.length
           ? p.overview
           : [{ title: '', description: '', screenshots: [] }],
@@ -251,16 +247,6 @@ export default function ProductEdit() {
         return setFieldError(field, null);
     }
   };
-
-  // ── Tag management ──────────────────────────────────────────────────────────
-  const addTag = () => {
-    const t = tagInput.trim();
-    const result = validateTag(t, form.tags);
-    if (!result.ok) { toast.error(result.error); return; }
-    update('tags', [...form.tags, t]);
-    setTagInput('');
-  };
-  const removeTag = (tag) => update('tags', form.tags.filter(t => t !== tag));
 
   // ── Repeater helpers ────────────────────────────────────────────────────────
   const addRepeaterItem = (field) =>
@@ -534,7 +520,6 @@ export default function ProductEdit() {
       if (developerName.length < LIMITS.developerName.min) { toast.error(`Developer name must be at least ${LIMITS.developerName.min} characters`); return false; }
       if (developerName.length > LIMITS.developerName.max) { toast.error(`Developer name must be under ${LIMITS.developerName.max} characters`); return false; }
       if (!form.logo) { toast.error('Product logo is required'); return false; }
-      if (!form.tags || form.tags.length === 0) { toast.error('At least 1 tag is required'); return false; }
     }
     if (s === 1) {
       // Overview
@@ -1026,41 +1011,6 @@ export default function ProductEdit() {
               <FieldError msg={fieldErrors.developerName} />
               <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
                 Required · {LIMITS.developerName.min}–{LIMITS.developerName.max} characters
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div className="form-group">
-              <label className="form-label">
-                Tags <span className="required">*</span>
-                <span style={{ fontSize: 11, color: '#9ca3af', float: 'right' }}>
-                  {form.tags.length}/{LIMITS.maxTags} tags · Max {LIMITS.tag.max} chars each
-                </span>
-              </label>
-              {form.tags.length < LIMITS.maxTags && (
-                <div className="option-input-row">
-                  <input
-                    type="text"
-                    className="form-input"
-                    placeholder="Add a tag"
-                    maxLength={LIMITS.tag.max}
-                    value={tagInput}
-                    onChange={(e) => setTagInput(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
-                  />
-                  <button type="button" className="btn btn-secondary" onClick={addTag}>Add</button>
-                </div>
-              )}
-              <div className="flex gap-sm flex-wrap mt-sm">
-                {form.tags.map(tag => (
-                  <span key={tag} className="tag">
-                    {tag}
-                    <span className="tag-remove" onClick={() => removeTag(tag)}>&times;</span>
-                  </span>
-                ))}
-              </div>
-              <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4 }}>
-                At least 1 tag is required
               </div>
             </div>
           </div>

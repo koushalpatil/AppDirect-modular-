@@ -1,18 +1,20 @@
+const mongoose = require('mongoose');
 const Product = require('../models/Product');
 const Attribute = require('../models/Attribute');
 const ProductEditLog = require('../models/ProductEditLog');
+const ContactFormTemplate = require('../models/ContactFormTemplate');
 
-/**
- * Strip client-only metadata (_uid) from contact fields before persisting.
- * If useCustomContactForm is false, return an empty array.
- */
-const sanitizeContactFields = (fields, useCustom) => {
-  if (!useCustom) return [];
-  if (!Array.isArray(fields)) return [];
-  return fields.map(({ _uid, _doc, __v, ...field }) => ({
-    ...field,
-    options: (field.options || []).map(({ _id, ...opt }) => opt),
-  }));
+/** Resolve a non-empty contactFormTemplate id to a real template _id, or return an error message. */
+const assertContactFormTemplateRef = async (raw) => {
+  const id = String(raw).trim();
+  if (!mongoose.Types.ObjectId.isValid(id)) {
+    return { error: 'Invalid contact form template id.' };
+  }
+  const exists = await ContactFormTemplate.findById(id).select('_id');
+  if (!exists) {
+    return { error: 'Contact form template not found.' };
+  }
+  return { value: exists._id };
 };
 
 const LIMITS = {
@@ -165,13 +167,27 @@ exports.createProduct = async (req, res) => {
       name, tagline, developerName, logo,
       overview, features, customTabs, attributes,
       supportDescription, policies, resources,
-      useCustomContactForm, contactFields, status,
+      contactFormTemplate: contactFormTemplateRaw,
+      status,
     } = req.body;
 
     const targetStatus = status || 'draft';
     const validationErrors = validateProductPayload(req.body, targetStatus);
     if (validationErrors.length > 0) {
       return res.status(400).json({ message: validationErrors[0], errors: validationErrors });
+    }
+
+    let contactFormTemplate = null;
+    if (
+      contactFormTemplateRaw !== undefined &&
+      contactFormTemplateRaw !== null &&
+      String(contactFormTemplateRaw).trim() !== ''
+    ) {
+      const check = await assertContactFormTemplateRef(contactFormTemplateRaw);
+      if (check.error) {
+        return res.status(400).json({ message: check.error });
+      }
+      contactFormTemplate = check.value;
     }
 
     const product = await Product.create({
@@ -186,8 +202,7 @@ exports.createProduct = async (req, res) => {
       supportDescription: sanitizeString(supportDescription, LIMITS.supportDescription.max),
       policies: sanitizeString(policies, LIMITS.policies.max),
       resources: resources || [],
-      useCustomContactForm: !!useCustomContactForm,
-      contactFields: sanitizeContactFields(contactFields, useCustomContactForm),
+      contactFormTemplate,
       status: targetStatus,
       createdBy: req.user._id,
       updatedBy: req.user._id,
@@ -300,25 +315,33 @@ exports.updateProduct = async (req, res) => {
       'name', 'tagline', 'developerName', 'logo',
       'overview', 'features', 'customTabs', 'attributes',
       'supportDescription', 'policies', 'resources',
-      'useCustomContactForm', 'contactFields', 'status',
+      'contactFormTemplate', 'status',
     ];
 
-    updateFields.forEach((field) => {
-      if (req.body[field] === undefined) return;
+    for (const field of updateFields) {
+      if (req.body[field] === undefined) continue;
 
       let value = req.body[field];
-      // Sanitize contactFields: strip _uid and clear when toggle is off
-      if (field === 'contactFields') {
-        value = sanitizeContactFields(value, req.body.useCustomContactForm ?? product.useCustomContactForm);
+
+      if (field === 'contactFormTemplate') {
+        if (value === null || value === '' || (typeof value === 'string' && !value.trim())) {
+          value = null;
+        } else {
+          const check = await assertContactFormTemplateRef(value);
+          if (check.error) {
+            return res.status(400).json({ message: check.error });
+          }
+          value = check.value;
+        }
       }
 
       const currentValue = product[field];
-      if (areValuesEqual(currentValue, value)) return;
+      if (areValuesEqual(currentValue, value)) continue;
 
       previousValues[field] = currentValue;
       changes[field] = value;
       product[field] = value;
-    });
+    }
 
     // Determine action type
     let action = 'updated';

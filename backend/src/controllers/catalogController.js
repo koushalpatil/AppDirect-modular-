@@ -1,3 +1,4 @@
+const mongoose = require('mongoose');
 const Attribute = require('../models/Attribute');
 const Product = require('../models/Product');
 
@@ -92,7 +93,6 @@ exports.getAttributes = async (req, res) => {
       attributes.map(async (attr) => {
         const count = await Product.countDocuments({
           'attributes.attributeId': attr._id,
-          status: 'published',
         });
         const attrObj = attr.toObject();
         attrObj.linkedProductsCount = count;
@@ -206,15 +206,23 @@ exports.deleteAttribute = async (req, res) => {
       return res.status(403).json({ message: 'The standard Category attribute cannot be deleted.' });
     }
 
-    // Check if any products use this attribute
-    const linkedProducts = await Product.countDocuments({ 'attributes.attributeId': req.params.id });
-    if (linkedProducts > 0) {
-      return res.status(409).json({
-        message: `Cannot delete. ${linkedProducts} product(s) are using this attribute.`,
-      });
+    const attrId = new mongoose.Types.ObjectId(attribute._id);
+    const linkedProducts = await Product.countDocuments({ 'attributes.attributeId': attrId });
+
+    if (attribute.requiredInProductEditor) {
+      if (linkedProducts > 0) {
+        return res.status(409).json({
+          message: `Cannot delete. This required attribute is still assigned on ${linkedProducts} product(s).`,
+        });
+      }
+    } else if (linkedProducts > 0) {
+      await Product.updateMany(
+        { 'attributes.attributeId': attrId },
+        { $pull: { attributes: { attributeId: attrId } } },
+      );
     }
 
-    await Attribute.findByIdAndDelete(req.params.id);
+    await Attribute.findByIdAndDelete(attrId);
     res.json({ message: 'Attribute deleted successfully.' });
   } catch (error) {
     console.error('Delete attribute error:', error);

@@ -274,7 +274,7 @@ export default function CatalogManagement() {
             <p style={{ color: '#64748b', lineHeight: 1.5, marginBottom: 20 }}>
               {deleteTarget.required
                 ? `“${deleteTarget.name}” is a required field and must remain available for products that rely on it.`
-                : `This will permanently remove “${deleteTarget.name}”. ${deleteTarget.linked > 0 ? `It is currently used by ${deleteTarget.linked} product(s).` : 'No products are currently using it.'}`}
+                : `This will permanently remove “${deleteTarget.name}” from the catalog.${deleteTarget.linked > 0 ? ` It will be removed from ${deleteTarget.linked} product(s) that still reference it.` : ' No products are currently using it.'}`}
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
               <button className="btn btn-secondary" onClick={() => setDeleteTarget(null)}>{deleteTarget.required ? 'OK' : 'Cancel'}</button>
