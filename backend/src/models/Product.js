@@ -36,7 +36,6 @@ const productSchema = new mongoose.Schema({
   tagline: { type: String, trim: true, maxlength: 300 },
   developerName: { type: String, trim: true, maxlength: 100 },
   logo: { type: String },
-  tags: [{ type: String, trim: true }],
   overview: [overviewSchema],
   features: [featureSchema],
   customTabs: [customTabSchema],
@@ -104,7 +103,7 @@ const productSchema = new mongoose.Schema({
   },
 }, { timestamps: true });
 
-productSchema.index({ name: 'text', tagline: 'text', tags: 'text' });
+productSchema.index({ name: 'text', tagline: 'text' });
 productSchema.index({ status: 1 });
 productSchema.index({ 'attributes.attributeId': 1 });
 

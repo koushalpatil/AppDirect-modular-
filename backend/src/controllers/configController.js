@@ -360,7 +360,7 @@ exports.updateContactConfig = async (req, res) => {
 exports.getHomepageConfig = async (req, res) => {
   try {
     let config = await ContentConfig.findOne({ type: 'homepage' })
-      .populate('homepageCategories.products', 'name tagline logo tags status');
+      .populate('homepageCategories.products', 'name tagline logo status');
 
     if (!config) {
       config = await ContentConfig.create({
@@ -396,7 +396,7 @@ exports.updateHomepageConfig = async (req, res) => {
 
     // Re-fetch with populated products
     config = await ContentConfig.findOne({ type: 'homepage' })
-      .populate('homepageCategories.products', 'name tagline logo tags status');
+      .populate('homepageCategories.products', 'name tagline logo status');
 
     res.json({ message: 'Homepage configuration updated.', config });
   } catch (error) {
@@ -412,7 +412,7 @@ exports.getPublicHomepage = async (req, res) => {
       .populate({
         path: 'homepageCategories.products',
         match: { status: 'published' },
-        select: 'name tagline logo tags developerName',
+        select: 'name tagline logo developerName',
       });
 
     res.json({
@@ -548,7 +548,7 @@ exports.getUserApps = async (req, res) => {
     const products = await Product.find({
       _id: { $in: submissions },
       status: 'published'
-    }).select('name tagline logo tags status developerName');
+    }).select('name tagline logo status developerName');
 
     res.json({ products });
   } catch (error) {

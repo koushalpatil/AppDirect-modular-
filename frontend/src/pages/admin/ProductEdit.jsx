@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { productAPI, catalogAPI, uploadAPI, configAPI } from '../../services/api';
 import toast from 'react-hot-toast';
@@ -35,6 +35,91 @@ function FieldError({ msg }) {
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginTop: 4, color: '#ef4444', fontSize: 12 }}>
       <AlertCircle size={12} /> {msg}
+    </div>
+  );
+}
+
+function MultiSelectDropdownField({ label, options, values = [], onChange, placeholder = 'Select one or more' }) {
+  const [open, setOpen] = useState(false);
+  const wrapperRef = useRef(null);
+
+  useEffect(() => {
+    const onDocClick = (event) => {
+      if (!wrapperRef.current?.contains(event.target)) {
+        setOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', onDocClick);
+    return () => document.removeEventListener('mousedown', onDocClick);
+  }, []);
+
+  const toggleValue = (option) => {
+    if (values.includes(option)) {
+      onChange(values.filter((v) => v !== option));
+      return;
+    }
+    onChange([...values, option]);
+  };
+
+  const summaryText = values.length > 0 ? values.join(', ') : placeholder;
+
+  return (
+    <div className="form-group" style={{ marginBottom: 0 }} ref={wrapperRef}>
+      <label className="form-label">{label}</label>
+      <button
+        type="button"
+        className="form-select"
+        onClick={() => setOpen((prev) => !prev)}
+        style={{
+          width: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: 12,
+          textAlign: 'left',
+          cursor: 'pointer',
+        }}
+      >
+        <span style={{ color: values.length ? '#0f172a' : '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {summaryText}
+        </span>
+        <ChevronDown size={14} style={{ color: '#64748b', flex: '0 0 auto' }} />
+      </button>
+
+      {open && (
+        <div style={{
+          marginTop: 8,
+          border: '1px solid #dbe3ef',
+          borderRadius: 10,
+          background: '#fff',
+          maxHeight: 220,
+          overflowY: 'auto',
+          boxShadow: '0 14px 28px rgba(2, 6, 23, 0.08)',
+          padding: 6,
+        }}>
+          {options.map((option) => (
+            <label
+              key={option}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 8,
+                padding: '8px 10px',
+                borderRadius: 8,
+                cursor: 'pointer',
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={values.includes(option)}
+                onChange={() => toggleValue(option)}
+              />
+              <span style={{ color: '#334155', fontSize: 13 }}>{option}</span>
+            </label>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -178,21 +263,50 @@ export default function ProductEdit() {
   };
 
   // ── Attribute management ────────────────────────────────────────────────────
-  const toggleAttribute = (attr) => {
-    const existing = form.attributes.find(a => a.attributeId === attr._id);
-    if (existing) {
-      update('attributes', form.attributes.filter(a => a.attributeId !== attr._id));
-    } else {
-      update('attributes', [
-        ...form.attributes,
-        { attributeId: attr._id, attributeName: attr.name, values: [] },
-      ]);
-    }
+  useEffect(() => {
+    if (!attributes.length) return;
+    const required = attributes.filter(a => a.requiredInProductEditor);
+    if (!required.length) return;
+
+    setForm(prev => {
+      const existingIds = new Set((prev.attributes || []).map(a => String(a.attributeId)));
+      const missingRequired = required.filter(a => !existingIds.has(String(a._id)));
+      if (!missingRequired.length) return prev;
+      return {
+        ...prev,
+        attributes: [
+          ...(prev.attributes || []),
+          ...missingRequired.map(a => ({ attributeId: a._id, attributeName: a.name, values: [] })),
+        ],
+      };
+    });
+  }, [attributes]);
+
+  const setAttributeValues = (attr, values) => {
+    const normalized = [...new Set((values || []).map(v => String(v).trim()).filter(Boolean))];
+    const shouldKeep = attr.requiredInProductEditor || normalized.length > 0;
+
+    setForm((prev) => {
+      const next = [...(prev.attributes || [])];
+      const idx = next.findIndex((a) => String(a.attributeId) === String(attr._id));
+
+      if (idx >= 0) {
+        if (shouldKeep) {
+          next[idx] = { ...next[idx], attributeId: attr._id, attributeName: attr.name, values: normalized };
+        } else {
+          next.splice(idx, 1);
+        }
+      } else if (shouldKeep) {
+        next.push({ attributeId: attr._id, attributeName: attr.name, values: normalized });
+      }
+
+      return { ...prev, attributes: next };
+    });
   };
-  const setAttributeValues = (attrId, values) => {
-    update('attributes', form.attributes.map(a =>
-      a.attributeId === attrId ? { ...a, values } : a
-    ));
+
+  const getAttributeValues = (attrId) => {
+    const existing = (form.attributes || []).find((a) => String(a.attributeId) === String(attrId));
+    return existing?.values || [];
   };
 
   // ── Logo upload ─────────────────────────────────────────────────────────────
@@ -1081,46 +1195,42 @@ export default function ProductEdit() {
         <div className="wizard-content card card-body">
           <div className="wizard-section">
             <h3 className="wizard-section-title">Attributes</h3>
-            {attributes.map(attr => {
-              const formAttr = form.attributes.find(a => a.attributeId === attr._id);
-              return (
-                <div key={attr._id} className="repeater-item">
-                  <div className="flex items-center justify-between mb-md">
-                    <div>
+            {attributes.length === 0 ? (
+              <p className="text-muted" style={{ fontSize: '14px' }}>
+                No attributes configured. Go to Attribute Management to add attributes.
+              </p>
+            ) : (
+              attributes.map((attr) => {
+                const selectedValues = getAttributeValues(attr._id);
+                return (
+                  <div key={attr._id} className="repeater-item">
+                    <div className="mb-md">
                       <span style={{ fontWeight: 600 }}>{attr.name}</span>
-                      {attr.requiredInProductEditor && <span className="required">*</span>}
+                      {attr.requiredInProductEditor && <span className="required" style={{ marginLeft: 4 }}>*</span>}
+                      {attr.description && (
+                        <p className="text-muted" style={{ fontSize: '12px', marginTop: 2 }}>
+                          {attr.description}
+                        </p>
+                      )}
                     </div>
-                    <label className="toggle">
-                      <input
-                        type="checkbox"
-                        checked={!!formAttr}
-                        onChange={() => toggleAttribute(attr)}
+
+                    {attr.options.length > 0 ? (
+                      <MultiSelectDropdownField
+                        label={`Select ${attr.name} values`}
+                        options={attr.options}
+                        values={selectedValues}
+                        onChange={(vals) => setAttributeValues(attr, vals)}
+                        placeholder="Choose one or more"
                       />
-                      <span className="toggle-slider" />
-                    </label>
+                    ) : (
+                      <p className="text-muted" style={{ fontSize: 12, marginBottom: 0 }}>
+                        No predefined options for this attribute.
+                      </p>
+                    )}
                   </div>
-                  {formAttr && attr.options.length > 0 && (
-                    <div className="flex gap-sm flex-wrap">
-                      {attr.options.map(opt => (
-                        <button
-                          key={opt}
-                          type="button"
-                          className={`product-select-chip ${formAttr.values.includes(opt) ? 'selected' : ''}`}
-                          onClick={() => {
-                            const vals = formAttr.values.includes(opt)
-                              ? formAttr.values.filter(v => v !== opt)
-                              : [...formAttr.values, opt];
-                            setAttributeValues(attr._id, vals);
-                          }}
-                        >
-                          {opt}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                );
+              })
+            )}
           </div>
         </div>
       )}

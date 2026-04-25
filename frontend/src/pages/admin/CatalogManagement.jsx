@@ -8,7 +8,7 @@ import './Admin.css';
 const LIMITS = {
   name: { min: 2, max: 100 },
   description: { max: 500 },
-  option: { max: 100 },
+  option: { max: 50 },
   maxOptions: 50,
 };
 
@@ -273,7 +273,7 @@ export default function CatalogManagement() {
             </h3>
             <p style={{ color: '#64748b', lineHeight: 1.5, marginBottom: 20 }}>
               {deleteTarget.required
-                ? `“${deleteTarget.name}” is required in the product editor, so it must stay available for products that depend on it.`
+                ? `“${deleteTarget.name}” is a required field and must remain available for products that rely on it.`
                 : `This will permanently remove “${deleteTarget.name}”. ${deleteTarget.linked > 0 ? `It is currently used by ${deleteTarget.linked} product(s).` : 'No products are currently using it.'}`}
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 12 }}>
@@ -356,11 +356,11 @@ export default function CatalogManagement() {
               {showAdvanced && (
                 <>
                   <div className="toggle-wrapper">
-                    <span className="toggle-label">Show in Additional Settings</span>
+                    <span className="toggle-label">Display in Additional Information</span>
                     <label className="toggle"><input type="checkbox" checked={form.displayOnHomepage} onChange={(e) => setForm(prev => ({ ...prev, displayOnHomepage: e.target.checked }))} /><span className="toggle-slider" /></label>
                   </div>
                   <div className="toggle-wrapper">
-                    <span className="toggle-label">Make this field required in the product editor</span>
+                    <span className="toggle-label">Make this field required in the product creation</span>
                     <label className="toggle"><input type="checkbox" checked={form.requiredInProductEditor} onChange={(e) => setForm(prev => ({ ...prev, requiredInProductEditor: e.target.checked }))} /><span className="toggle-slider" /></label>
                   </div>
                   <div className="toggle-wrapper">

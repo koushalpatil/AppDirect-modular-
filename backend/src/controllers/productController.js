@@ -19,8 +19,6 @@ const LIMITS = {
   name: { min: 2, max: 100 },
   tagline: { max: 150 },
   developerName: { max: 100 },
-  tag: { max: 30 },
-  maxTags: 20,
   overviewTitle: { max: 100 },
   overviewDescription: { max: 5000 },
   featureTitle: { max: 100 },
@@ -129,14 +127,6 @@ const validateProductPayload = (data, targetStatus) => {
   if (data.developerName && data.developerName.length > LIMITS.developerName.max) {
     errors.push(`Developer name must be under ${LIMITS.developerName.max} characters.`);
   }
-  if (Array.isArray(data.tags)) {
-    if (data.tags.length > LIMITS.maxTags) errors.push(`Maximum ${LIMITS.maxTags} tags allowed.`);
-    data.tags.forEach((t, i) => {
-      if (typeof t === 'string' && t.length > LIMITS.tag.max) {
-        errors.push(`Tag #${i + 1} must be under ${LIMITS.tag.max} characters.`);
-      }
-    });
-  }
   (data.overview || []).forEach((item, i) => {
     if (item.title && item.title.length > LIMITS.overviewTitle.max) errors.push(`Overview #${i + 1} title too long.`);
     if (item.description && item.description.length > LIMITS.overviewDescription.max) errors.push(`Overview #${i + 1} description too long.`);
@@ -172,7 +162,7 @@ const validateProductPayload = (data, targetStatus) => {
 exports.createProduct = async (req, res) => {
   try {
     const {
-      name, tagline, developerName, logo, tags,
+      name, tagline, developerName, logo,
       overview, features, customTabs, attributes,
       supportDescription, policies, resources,
       useCustomContactForm, contactFields, status,
@@ -189,7 +179,6 @@ exports.createProduct = async (req, res) => {
       tagline: sanitizeString(tagline, LIMITS.tagline.max),
       developerName: sanitizeString(developerName, LIMITS.developerName.max),
       logo,
-      tags: (tags || []).map(t => sanitizeString(t, LIMITS.tag.max)).filter(Boolean),
       overview: overview || [],
       features: features || [],
       customTabs: customTabs || [],
@@ -235,7 +224,6 @@ exports.getProducts = async (req, res) => {
       filter.$or = [
         { name: { $regex: trimmedSearch, $options: 'i' } },
         { tagline: { $regex: trimmedSearch, $options: 'i' } },
-        { tags: { $regex: trimmedSearch, $options: 'i' } },
         { developerName: { $regex: trimmedSearch, $options: 'i' } },
       ];
     }
@@ -309,7 +297,7 @@ exports.updateProduct = async (req, res) => {
     const previousValues = {};
     const changes = {};
     const updateFields = [
-      'name', 'tagline', 'developerName', 'logo', 'tags',
+      'name', 'tagline', 'developerName', 'logo',
       'overview', 'features', 'customTabs', 'attributes',
       'supportDescription', 'policies', 'resources',
       'useCustomContactForm', 'contactFields', 'status',
@@ -407,7 +395,6 @@ exports.getPublishedProducts = async (req, res) => {
       filter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { tagline: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
         { developerName: { $regex: search, $options: 'i' } },
       ];
     }
@@ -451,7 +438,7 @@ exports.getProductsByAttribute = async (req, res) => {
     }
 
     const products = await Product.find(filter)
-      .select('name tagline logo tags developerName')
+      .select('name tagline logo developerName')
       .sort({ updatedAt: -1 })
       .limit(parseInt(limit));
 
@@ -532,7 +519,6 @@ exports.searchProducts = async (req, res) => {
             name: 1,
             tagline: 1,
             logo: 1,
-            tags: 1,
             developerName: 1,
             attributes: 1,
             createdAt: 1,
@@ -550,7 +536,7 @@ exports.searchProducts = async (req, res) => {
                 {
                   text: {
                     query: search.trim(),
-                    path: ['name', 'tagline', 'tags'],
+                    path: ['name', 'tagline'],
                     fuzzy: { maxEdits: 1, prefixLength: 2 },
                   },
                 },
@@ -579,7 +565,7 @@ exports.searchProducts = async (req, res) => {
 
       total = await Product.countDocuments(filter);
       const query = Product.find(filter)
-        .select('name tagline logo tags developerName attributes createdAt updatedAt')
+        .select('name tagline logo developerName attributes createdAt updatedAt')
         .populate('attributes.attributeId', 'name displayOnHomepage showForFiltering')
         .sort(sortQuery)
         .skip(skip)
@@ -631,7 +617,6 @@ exports.getFilterFacets = async (req, res) => {
       baseFilter.$or = [
         { name: { $regex: search, $options: 'i' } },
         { tagline: { $regex: search, $options: 'i' } },
-        { tags: { $regex: search, $options: 'i' } },
         { developerName: { $regex: search, $options: 'i' } },
         { 'attributes.values': { $regex: search, $options: 'i' } },
       ];
