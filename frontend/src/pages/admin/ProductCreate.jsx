@@ -15,6 +15,7 @@ import {
   RESOURCE_MAX_SIZE_MB,
 } from '../../utils/productValidation';
 import ContactFieldEditor from '../../components/admin/ContactFieldEditor';
+import VideoUrlsEditor from '../../components/admin/VideoUrlsEditor';
 
 const STEPS = ['Define Product', 'Define Tabs', 'Define Attributes', 'Configure Contact Us Form'];
 
@@ -140,8 +141,8 @@ export default function ProductCreate() {
     tagline: '',
     developerName: '',
     logo: '',
-    overview: [{ title: '', description: '', screenshots: [] }],
-    features: [{ title: '', description: '', screenshots: [] }],
+    overview: [{ title: '', description: '', screenshots: [], videos: [] }],
+    features: [{ title: '', description: '', screenshots: [], videos: [] }],
     customTabs: [],
     attributes: [],
     resources: [],
@@ -211,7 +212,7 @@ export default function ProductCreate() {
 
   // ── Repeater helpers ────────────────────────────────────────────────────────
   const addRepeaterItem = (field) =>
-    update(field, [...form[field], { title: '', description: '', screenshots: [] }]);
+    update(field, [...form[field], { title: '', description: '', screenshots: [], videos: [] }]);
   const removeRepeaterItem = (field, idx) =>
     update(field, form[field].filter((_, i) => i !== idx));
   const updateRepeater = (field, idx, key, val) => {
@@ -393,7 +394,7 @@ export default function ProductCreate() {
       toast.error(`Maximum ${LIMITS.maxCustomTabs} custom tabs allowed.`);
       return;
     }
-    update('customTabs', [...form.customTabs, { tabName: '', elements: [{ title: '', description: '', screenshots: [] }] }]);
+    update('customTabs', [...form.customTabs, { tabName: '', elements: [{ title: '', description: '', screenshots: [], videos: [] }] }]);
   };
 
   const removeCustomTab = (tabIdx) => {
@@ -413,7 +414,7 @@ export default function ProductCreate() {
       return;
     }
     const tabs = [...form.customTabs];
-    tabs[tabIdx] = { ...tabs[tabIdx], elements: [...tabs[tabIdx].elements, { title: '', description: '', screenshots: [] }] };
+    tabs[tabIdx] = { ...tabs[tabIdx], elements: [...tabs[tabIdx].elements, { title: '', description: '', screenshots: [], videos: [] }] };
     update('customTabs', tabs);
   };
 
@@ -582,7 +583,11 @@ export default function ProductCreate() {
       ...tab,
       elements: (tab.elements || []).filter(
         el => (el.title || '').trim() || (el.description || '').trim()
-      ),
+      ).map((el) => ({
+        ...el,
+        screenshots: el.screenshots || [],
+        videos: el.videos || [],
+      })),
     }));
 
     const payload = {
@@ -718,6 +723,10 @@ export default function ProductCreate() {
                       )}
                     </div>
                   </div>
+                  <VideoUrlsEditor
+                    urls={item.videos || []}
+                    onChange={(next) => updateRepeater(field, idx, 'videos', next)}
+                  />
                 </>
               )}
             </>
@@ -791,6 +800,10 @@ export default function ProductCreate() {
                   )}
                 </div>
               </div>
+              <VideoUrlsEditor
+                urls={item.videos || []}
+                onChange={(next) => updateRepeater(field, idx, 'videos', next)}
+              />
             </>
           )}
         </div>
@@ -1209,6 +1222,10 @@ export default function ProductCreate() {
                             )}
                           </div>
                         </div>
+                        <VideoUrlsEditor
+                          urls={el.videos || []}
+                          onChange={(next) => updateCustomTabElement(tabIdx, elIdx, 'videos', next)}
+                        />
                       </div>
                     ))}
 

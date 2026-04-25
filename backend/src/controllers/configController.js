@@ -532,8 +532,8 @@ exports.updateFooterConfig = async (req, res) => {
     if (footerSections !== undefined) {
       if (!Array.isArray(footerSections)) {
         errors.push('footerSections must be an array.');
-      } else if (footerSections.length > 2) {
-        errors.push('Maximum 2 footer sections allowed.');
+      } else if (footerSections.length > 3) {
+        errors.push('Maximum 3 footer sections allowed.');
       } else {
         footerSections.forEach((section, i) => {
           if (!section.title || !section.title.trim()) errors.push(`Section #${i + 1}: title is required.`);

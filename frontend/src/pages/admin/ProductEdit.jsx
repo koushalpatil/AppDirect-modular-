@@ -15,6 +15,7 @@ import {
   RESOURCE_MAX_SIZE_MB,
 } from '../../utils/productValidation';
 import ContactFieldEditor from '../../components/admin/ContactFieldEditor';
+import VideoUrlsEditor from '../../components/admin/VideoUrlsEditor';
 
 const STEPS = ['Define Product', 'Define Tabs', 'Define Attributes', 'Configure Contact Us Form'];
 
@@ -171,18 +172,26 @@ export default function ProductEdit() {
     try {
       const res = await productAPI.getOne(id);
       const p = res.data.product;
+      const normBlock = (o) => ({
+        ...o,
+        screenshots: o.screenshots || [],
+        videos: o.videos || [],
+      });
       setForm({
         name: p.name || '',
         tagline: p.tagline || '',
         developerName: p.developerName || '',
         logo: p.logo || '',
         overview: p.overview?.length
-          ? p.overview
-          : [{ title: '', description: '', screenshots: [] }],
+          ? p.overview.map(normBlock)
+          : [{ title: '', description: '', screenshots: [], videos: [] }],
         features: p.features?.length
-          ? p.features
-          : [{ title: '', description: '', screenshots: [] }],
-        customTabs: p.customTabs || [],
+          ? p.features.map(normBlock)
+          : [{ title: '', description: '', screenshots: [], videos: [] }],
+        customTabs: (p.customTabs || []).map((tab) => ({
+          ...tab,
+          elements: (tab.elements || []).map((el) => normBlock(el)),
+        })),
         attributes: (p.attributes || []).map(a => ({
           attributeId: a.attributeId?._id || a.attributeId,
           attributeName: a.attributeId?.name || a.attributeName,
@@ -250,7 +259,7 @@ export default function ProductEdit() {
 
   // ── Repeater helpers ────────────────────────────────────────────────────────
   const addRepeaterItem = (field) =>
-    update(field, [...form[field], { title: '', description: '', screenshots: [] }]);
+    update(field, [...form[field], { title: '', description: '', screenshots: [], videos: [] }]);
   const removeRepeaterItem = (field, idx) =>
     update(field, form[field].filter((_, i) => i !== idx));
   const updateRepeater = (field, idx, key, val) => {
@@ -426,7 +435,7 @@ export default function ProductEdit() {
       toast.error(`Maximum ${LIMITS.maxCustomTabs} custom tabs allowed.`);
       return;
     }
-    update('customTabs', [...form.customTabs, { tabName: '', elements: [{ title: '', description: '', screenshots: [] }] }]);
+    update('customTabs', [...form.customTabs, { tabName: '', elements: [{ title: '', description: '', screenshots: [], videos: [] }] }]);
   };
 
   const removeCustomTab = (tabIdx) => {
@@ -446,7 +455,7 @@ export default function ProductEdit() {
       return;
     }
     const tabs = [...form.customTabs];
-    tabs[tabIdx] = { ...tabs[tabIdx], elements: [...tabs[tabIdx].elements, { title: '', description: '', screenshots: [] }] };
+    tabs[tabIdx] = { ...tabs[tabIdx], elements: [...tabs[tabIdx].elements, { title: '', description: '', screenshots: [], videos: [] }] };
     update('customTabs', tabs);
   };
 
@@ -603,7 +612,11 @@ export default function ProductEdit() {
       ...tab,
       elements: (tab.elements || []).filter(
         el => (el.title || '').trim() || (el.description || '').trim()
-      ),
+      ).map((el) => ({
+        ...el,
+        screenshots: el.screenshots || [],
+        videos: el.videos || [],
+      })),
     }));
 
     const payload = {
@@ -739,6 +752,10 @@ export default function ProductEdit() {
                       )}
                     </div>
                   </div>
+                  <VideoUrlsEditor
+                    urls={item.videos || []}
+                    onChange={(next) => updateRepeater(field, idx, 'videos', next)}
+                  />
                 </>
               )}
             </>
@@ -812,6 +829,10 @@ export default function ProductEdit() {
                   )}
                 </div>
               </div>
+              <VideoUrlsEditor
+                urls={item.videos || []}
+                onChange={(next) => updateRepeater(field, idx, 'videos', next)}
+              />
             </>
           )}
         </div>
@@ -1234,6 +1255,10 @@ export default function ProductEdit() {
                             )}
                           </div>
                         </div>
+                        <VideoUrlsEditor
+                          urls={el.videos || []}
+                          onChange={(next) => updateCustomTabElement(tabIdx, elIdx, 'videos', next)}
+                        />
                       </div>
                     ))}
 

@@ -15,6 +15,9 @@ export const SCREENSHOT_MAX_SIZE_MB = 5;
 export const SCREENSHOT_MAX_SIZE_BYTES = SCREENSHOT_MAX_SIZE_MB * 1024 * 1024;
 export const SCREENSHOT_ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 export const SCREENSHOT_MAX_PER_SECTION = 10;
+/** Max video URLs per overview/feature/custom-tab element (carousel slots). */
+export const VIDEO_MAX_PER_SECTION = 5;
+export const VIDEO_URL_MAX_LENGTH = 500;
 
 export const RESOURCE_ALLOWED_TYPES = [
   'application/pdf',
@@ -176,6 +179,34 @@ export function isValidUrl(str) {
 }
 
 // ── Validate tag ──────────────────────────────────────────────────────────────
+/** Returns empty string if valid, otherwise an error message. */
+export function validateVideoUrlForProduct(raw) {
+  const u = String(raw || '').trim();
+  if (!u) return 'Enter a video URL.';
+  if (u.length > VIDEO_URL_MAX_LENGTH) return `URL must be under ${VIDEO_URL_MAX_LENGTH} characters.`;
+  let parsed;
+  try {
+    parsed = new URL(u);
+  } catch {
+    return 'Enter a valid http(s) URL.';
+  }
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    return 'URL must use http or https.';
+  }
+  const host = parsed.hostname.replace(/^www\./, '').toLowerCase();
+  const lower = u.toLowerCase().split('?')[0];
+  const direct = ['.mp4', '.webm', '.ogg', '.mov', '.m3u8'].some((ext) => lower.endsWith(ext));
+  const youtube =
+    host.includes('youtube.com') ||
+    host === 'youtu.be' ||
+    host.includes('youtube-nocookie.com');
+  const vimeo = host.includes('vimeo.com');
+  if (!youtube && !vimeo && !direct) {
+    return 'Use YouTube, Vimeo, or a direct link to a video file (.mp4, .webm, …).';
+  }
+  return '';
+}
+
 export function validateTag(tag, existingTags) {
   const t = tag.trim();
   if (!t) return { ok: false, error: 'Tag cannot be empty.' };
@@ -253,6 +284,14 @@ export function validateProductForm(form) {
     if (item.screenshots && item.screenshots.length > SCREENSHOT_MAX_PER_SECTION) {
       errors.push(`Overview #${i + 1} can have at most ${SCREENSHOT_MAX_PER_SECTION} screenshots.`);
     }
+    const vids = item.videos || [];
+    if (vids.length > VIDEO_MAX_PER_SECTION) {
+      errors.push(`Overview #${i + 1} can have at most ${VIDEO_MAX_PER_SECTION} video links.`);
+    }
+    vids.forEach((vu, vi) => {
+      const ve = validateVideoUrlForProduct(vu);
+      if (ve) errors.push(`Overview #${i + 1} video #${vi + 1}: ${ve}`);
+    });
   });
 
   // Features
@@ -284,6 +323,14 @@ export function validateProductForm(form) {
     if (item.screenshots && item.screenshots.length > SCREENSHOT_MAX_PER_SECTION) {
       errors.push(`Feature #${i + 1} can have at most ${SCREENSHOT_MAX_PER_SECTION} screenshots.`);
     }
+    const vids = item.videos || [];
+    if (vids.length > VIDEO_MAX_PER_SECTION) {
+      errors.push(`Feature #${i + 1} can have at most ${VIDEO_MAX_PER_SECTION} video links.`);
+    }
+    vids.forEach((vu, vi) => {
+      const ve = validateVideoUrlForProduct(vu);
+      if (ve) errors.push(`Feature #${i + 1} video #${vi + 1}: ${ve}`);
+    });
   });
 
   // Support & Policies
@@ -336,6 +383,14 @@ export function validateProductForm(form) {
       if (el.screenshots && el.screenshots.length > SCREENSHOT_MAX_PER_SECTION) {
         errors.push(`Custom tab "${tn}" element #${ei + 1} can have at most ${SCREENSHOT_MAX_PER_SECTION} screenshots.`);
       }
+      const ev = el.videos || [];
+      if (ev.length > VIDEO_MAX_PER_SECTION) {
+        errors.push(`Custom tab "${tn}" element #${ei + 1} can have at most ${VIDEO_MAX_PER_SECTION} video links.`);
+      }
+      ev.forEach((vu, vi) => {
+        const ve = validateVideoUrlForProduct(vu);
+        if (ve) errors.push(`Custom tab "${tn}" element #${ei + 1} video #${vi + 1}: ${ve}`);
+      });
     });
   });
 

@@ -17,6 +17,9 @@ const assertContactFormTemplateRef = async (raw) => {
   return { value: exists._id };
 };
 
+const VIDEO_MAX_PER_BLOCK = 5;
+const VIDEO_URL_MAX_LEN = 500;
+
 const LIMITS = {
   name: { min: 2, max: 100 },
   tagline: { max: 150 },
@@ -132,10 +135,22 @@ const validateProductPayload = (data, targetStatus) => {
   (data.overview || []).forEach((item, i) => {
     if (item.title && item.title.length > LIMITS.overviewTitle.max) errors.push(`Overview #${i + 1} title too long.`);
     if (item.description && item.description.length > LIMITS.overviewDescription.max) errors.push(`Overview #${i + 1} description too long.`);
+    const vids = item.videos || [];
+    if (vids.length > VIDEO_MAX_PER_BLOCK) errors.push(`Overview #${i + 1}: at most ${VIDEO_MAX_PER_BLOCK} video links allowed.`);
+    vids.forEach((u, vi) => {
+      const s = String(u || '').trim();
+      if (s.length > VIDEO_URL_MAX_LEN) errors.push(`Overview #${i + 1} video #${vi + 1}: URL too long.`);
+    });
   });
   (data.features || []).forEach((item, i) => {
     if (item.title && item.title.length > LIMITS.featureTitle.max) errors.push(`Feature #${i + 1} title too long.`);
     if (item.description && item.description.length > LIMITS.featureDescription.max) errors.push(`Feature #${i + 1} description too long.`);
+    const vids = item.videos || [];
+    if (vids.length > VIDEO_MAX_PER_BLOCK) errors.push(`Feature #${i + 1}: at most ${VIDEO_MAX_PER_BLOCK} video links allowed.`);
+    vids.forEach((u, vi) => {
+      const s = String(u || '').trim();
+      if (s.length > VIDEO_URL_MAX_LEN) errors.push(`Feature #${i + 1} video #${vi + 1}: URL too long.`);
+    });
   });
   if (data.supportDescription && data.supportDescription.length > LIMITS.supportDescription.max) {
     errors.push(`Support description must be under ${LIMITS.supportDescription.max} characters.`);
@@ -154,6 +169,12 @@ const validateProductPayload = (data, targetStatus) => {
     els.forEach((el, ei) => {
       if (el.title && el.title.length > LIMITS.customTabElementTitle.max) errors.push(`Tab "${tn}" element #${ei + 1} title too long.`);
       if (el.description && el.description.length > LIMITS.customTabElementDescription.max) errors.push(`Tab "${tn}" element #${ei + 1} description too long.`);
+      const vids = el.videos || [];
+      if (vids.length > VIDEO_MAX_PER_BLOCK) errors.push(`Tab "${tn}" element #${ei + 1}: at most ${VIDEO_MAX_PER_BLOCK} video links allowed.`);
+      vids.forEach((u, vi) => {
+        const s = String(u || '').trim();
+        if (s.length > VIDEO_URL_MAX_LEN) errors.push(`Tab "${tn}" element #${ei + 1} video #${vi + 1}: URL too long.`);
+      });
     });
   });
 

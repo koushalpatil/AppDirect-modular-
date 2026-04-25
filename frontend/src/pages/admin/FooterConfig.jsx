@@ -238,7 +238,7 @@ export default function FooterConfig() {
 
   // ─── Section helpers ────────────────────────
   const addSection = () => {
-    if (sections.length >= 2) return toast.error('Maximum 2 sections allowed');
+    if (sections.length >= 3) return toast.error('Maximum 3 sections allowed');
     setSections([...sections, emptySection()]);
   };
   const removeSection = (i) => setSections(sections.filter((_, idx) => idx !== i));
@@ -430,17 +430,17 @@ export default function FooterConfig() {
                 <div className="fc-empty">
                   <div className="fc-empty-icon"><ColumnsIcon size={22} /></div>
                   <h4>No footer sections yet</h4>
-                  <p>Add up to 2 sections with navigation links that appear in the footer</p>
+                  <p>Add up to 3 sections with navigation links that appear in the footer</p>
                 </div>
               )}
 
               <button
                 className="fc-add-section-btn"
                 onClick={addSection}
-                disabled={sections.length >= 2}
+                disabled={sections.length >= 3}
               >
                 <Plus size={16} />
-                {sections.length >= 2 ? 'Maximum 2 sections reached' : 'Add Footer Section'}
+                {sections.length >= 3 ? 'Maximum 3 sections reached' : 'Add Footer Section'}
               </button>
             </>
           )}

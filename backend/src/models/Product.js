@@ -4,18 +4,21 @@ const overviewSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   description: { type: String, default: '' },
   screenshots: [{ type: String }],
+  videos: [{ type: String, trim: true }],
 }, { _id: true });
 
 const featureSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   description: { type: String, default: '' },
   screenshots: [{ type: String }],
+  videos: [{ type: String, trim: true }],
 }, { _id: true });
 
 const customTabElementSchema = new mongoose.Schema({
   title: { type: String, default: '' },
   description: { type: String, default: '' },
   screenshots: [{ type: String }],
+  videos: [{ type: String, trim: true }],
 }, { _id: true });
 
 const customTabSchema = new mongoose.Schema({

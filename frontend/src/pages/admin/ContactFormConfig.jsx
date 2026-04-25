@@ -253,7 +253,6 @@ export default function ContactFormConfig() {
               <div style={{ borderTop: '1px solid #e2e8f0', paddingTop: 20, marginTop: 12 }}>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
                   <h4 style={{ fontSize: 14, fontWeight: 700, margin: 0 }}>Form Fields</h4>
-                 
                 </div>
                 <ContactFieldEditor fields={templateFields} setFields={setTemplateFields} />
               </div>

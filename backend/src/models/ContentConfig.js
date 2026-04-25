@@ -91,7 +91,7 @@ const contentConfigSchema = new mongoose.Schema({
   homepageCategories: [homepageCategorySchema],
 
   // Footer config
-  footerSections: { type: [footerSectionSchema], default: [], validate: [v => v.length <= 2, 'Max 2 footer sections'] },
+  footerSections: { type: [footerSectionSchema], default: [], validate: [v => v.length <= 3, 'Max 3 footer sections'] },
   footerContent: { type: footerContentSchema, default: () => ({}) },
   socialMedia: { type: [socialMediaSchema], default: [] },
   bottomFooterLinks: { type: [bottomFooterLinkSchema], default: [] },
